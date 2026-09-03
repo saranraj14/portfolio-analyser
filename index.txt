@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Ledger</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230066B1'/%3E%3Ctext x='32' y='45' font-size='36' font-family='Georgia,serif' fill='white' text-anchor='middle'%3E%E2%82%B9%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --glass-bg: rgba(255,255,255,0.7);
+    --glass-bg-strong: rgba(255,255,255,0.85);
+    --glass-border: rgba(0,0,0,0.08);
+    --glass-border-top: rgba(255,255,255,0.9);
+    --glass-blur: 20px;
+    --glass-saturate: 100%;
+    --radius-sm: 14px;
+    --radius-lg: 24px;
+    --glass-shadow: 0 8px 28px rgba(0,0,0,0.06);
+    --ink: #1d1d1f;
+    --ink-dim: rgba(29,29,31,0.6);
+    --accent: #0066B1;
+    --accent-dim: #4A9FD6;
+    --accent-text: #ffffff;
+    --green: #1E8E4E;
+    --red: #E7222E;
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    --mono: 'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  }
+  [data-theme="dark"]{
+    --glass-bg: rgba(255,255,255,0.07);
+    --glass-bg-strong: rgba(255,255,255,0.12);
+    --glass-border: rgba(255,255,255,0.12);
+    --glass-border-top: rgba(255,255,255,0.22);
+    --glass-shadow: 0 8px 28px rgba(0,0,0,0.5);
+    --ink: #f5f5f7;
+    --ink-dim: rgba(245,245,247,0.6);
+    --accent: #3D8FE0;
+    --accent-dim: #6FADE8;
+    --accent-text: #ffffff;
+    --green: #4ADE80;
+    --red: #FF525C;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:var(--font-system);
+    color:var(--ink);
+    padding:32px 20px 70px;
+    transition:background 0.4s ease, color 0.3s ease;
+    background:#ffffff;
+  }
+  [data-theme="dark"] body{
+    background:#000000;
+  }
+  .wrap{max-width:1000px;margin:0 auto;}
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:24px;gap:16px;flex-wrap:wrap;
+    padding-bottom:16px;
+    border-bottom:3px solid transparent;
+    border-image:linear-gradient(90deg, var(--accent) 0%, var(--accent) 55%, var(--red) 100%) 1;
+  }
+  .masthead-title{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:11px;
+    background:linear-gradient(135deg, var(--accent) 40%, var(--red) 140%);
+    display:flex;align-items:center;justify-content:center;
+    font-family:Georgia,serif;font-size:19px;color:var(--accent-text);font-weight:700;
+    box-shadow:0 4px 14px rgba(0,0,0,0.22);
+    flex-shrink:0;
+  }
+  .masthead h1{
+    font-size:19px;letter-spacing:-0.01em;font-weight:700;margin:0;color:var(--ink);
+  }
+  .masthead .sub{color:var(--ink-dim);font-size:12.5px;margin-top:2px;font-weight:500;}
+  .stamp{font-family:var(--mono);font-size:11px;color:var(--ink-dim);text-align:right;line-height:1.5;}
+  #asof{color:var(--accent);font-weight:600;}
+
+  /* ---------- Theme toggle ---------- */
+  .theme-toggle{
+    display:flex;align-items:center;gap:6px;
+    background:var(--glass-bg);
+    backdrop-filter:blur(16px) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter:blur(16px) saturate(var(--glass-saturate));
+    border:1px solid var(--glass-border);
+    border-top-color:var(--glass-border-top);
+    border-radius:999px;
+    padding:4px;
+    box-shadow:var(--glass-shadow);
+  }
+  .theme-toggle button{
+    all:unset;display:flex;align-items:center;justify-content:center;
+
+    width:32px;height:32px;border-radius:999px;cursor:pointer;color:var(--ink-dim);
+    transition:transform 0.35s var(--spring), background 0.25s ease, color 0.25s ease;
+  }
+  .theme-toggle button svg{width:16px;height:16px;}
+  .theme-toggle button.active{
+    background:var(--accent);
+    color:var(--accent-text);
+    box-shadow:0 3px 10px rgba(0,0,0,0.25);
+  }
+  .theme-toggle button:hover{transform:scale(1.08);}
+  .theme-toggle button:active{transform:scale(0.94);}
+
+  /* ---------- Glass panel ---------- */
+  .panel{
+    background:var(--glass-bg);
+    backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border:1px solid var(--glass-border);
+    border-top-color:var(--glass-border-top);
+    border-radius:var(--radius-lg);
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,0.5),
+      inset 0 -1px 1px rgba(255,255,255,0.06),
+      var(--glass-shadow);
+    margin-bottom:22px;
+    overflow:hidden;
+    transition:background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+  }
+  [data-theme="dark"] .panel{
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,0.08),
+      inset 0 -1px 1px rgba(0,0,0,0.25),
+      var(--glass-shadow);
+  }
+  .panel-head{
+    padding:14px 20px;
+    border-bottom:2px solid transparent;
+    border-image:linear-gradient(90deg, var(--accent) 0%, var(--accent) 60%, var(--red) 100%) 1;
+    display:flex;justify-content:space-between;align-items:center;
+    background:rgba(255,255,255,0.08);
+  }
+  [data-theme="dark"] .panel-head{ background:rgba(0,0,0,0.12); }
+  .panel-head h2{
+    font-size:13px;text-transform:uppercase;letter-spacing:0.06em;
+    margin:0;color:var(--ink);font-weight:700;
+  }
+  .tag{
+    font-family:var(--mono);font-size:10px;font-weight:700;
+    color:var(--accent-text);background:var(--accent);
+    padding:3px 9px;border-radius:999px;letter-spacing:0.02em;
+  }
+  .tag-red{ background:var(--red) !important; }
+  .panel-body{padding:20px;}
+
+  /* ---------- Inputs & buttons ---------- */
+  textarea{
+    width:100%;min-height:110px;
+    background:rgba(255,255,255,0.35);
+    color:var(--ink);
+    border:1px solid var(--glass-border);
+    border-radius:var(--radius-sm);padding:12px;
+    font-family:var(--mono);font-size:12px;resize:vertical;
+    transition:background 0.3s ease, border-color 0.3s ease;
+  }
+  [data-theme="dark"] textarea{ background:rgba(0,0,0,0.22); }
+  textarea::placeholder{color:var(--ink-dim);}
+  textarea:focus{outline:none;border-color:var(--accent-dim);}
+
+  .btn-row{display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;}
+  button.primary{
+    position:relative;overflow:hidden;
+    background:linear-gradient(135deg, var(--accent) 45%, var(--red) 130%);
+    color:var(--accent-text);border:none;border-radius:999px;
+    padding:10px 20px;font-weight:600;font-size:13px;cursor:pointer;
+    font-family:var(--font-system);
+    box-shadow:0 6px 18px rgba(0,0,0,0.18);
+    transition:transform 0.35s var(--spring), box-shadow 0.35s ease-out, opacity 0.25s ease;
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  button.primary:hover{ transform:scale(1.035) translateY(-1px); box-shadow:0 10px 26px rgba(0,0,0,0.26); }
+  button.primary:active{ transform:scale(0.98); }
+  button.primary:disabled{ cursor:default; opacity:0.85; transform:none; }
+  button.ghost{
+    background:var(--glass-bg);
+    backdrop-filter:blur(16px) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter:blur(16px) saturate(var(--glass-saturate));
+    color:var(--accent);border:1.5px solid var(--accent);
+    border-radius:999px;padding:10px 18px;font-weight:600;font-size:13px;cursor:pointer;
+    font-family:var(--font-system);
+    transition:transform 0.35s var(--spring), color 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+  }
+  button.ghost:hover{ color:var(--accent-text); background:var(--accent); border-color:var(--accent); transform:scale(1.03); }
+  button.ghost:active{ transform:scale(0.97); }
+  .hint{color:var(--ink-dim);font-size:11.5px;margin-top:9px;line-height:1.5;}
+
+  /* Spinner used inside the primary button while "building" */
+  .btn-spinner{
+    width:14px;height:14px;border-radius:50%;
+    border:2px solid color-mix(in srgb, var(--accent-text) 35%, transparent);
+    border-top-color:var(--accent-text);
+    animation:spin 0.7s linear infinite;
+    display:none;
+  }
+  button.primary.loading .btn-spinner{ display:inline-block; }
+  button.primary.loading .btn-label::after{ content:"Building…"; }
+  button.primary.loading .btn-label{ font-size:0; }
+  button.primary.loading .btn-label::after{ font-size:13px; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Tables ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:right;font-family:var(--mono);font-size:10.5px;
+    text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-dim);
+    padding:9px 10px;border-bottom:1px solid var(--glass-border);font-weight:600;
+  }
+  th:first-child, td:first-child{text-align:left;}
+  td{
+    text-align:right;padding:10px;font-family:var(--mono);
+    border-bottom:1px solid rgba(120,110,90,0.12);font-size:12.5px;
+    transition:background 0.2s ease;
+  }
+  [data-theme="dark"] td{ border-bottom-color:rgba(255,255,255,0.06); }
+  tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:rgba(0,0,0,0.03);}
+  [data-theme="dark"] tbody tr:hover td{background:rgba(255,255,255,0.05);}
+  td.sym{font-family:var(--font-system);font-weight:700;letter-spacing:0.01em;color:var(--accent);}
+  td.sector-name{font-family:var(--font-system);color:var(--ink);font-weight:600;}
+  .up{color:var(--green);font-weight:600;}
+  .down{color:var(--red);font-weight:700;}
+  tfoot td{
+    border-top:2px solid var(--accent);font-weight:700;
+    color:var(--accent);background:var(--glass-bg-strong);
+  }
+
+  .barcell{display:flex;align-items:center;gap:10px;justify-content:flex-end;}
+  .bar-track{flex:1;max-width:140px;height:6px;background:rgba(120,110,90,0.18);border-radius:3px;overflow:hidden;}
+  [data-theme="dark"] .bar-track{ background:rgba(255,255,255,0.1); }
+  .bar-fill{height:100%;background:linear-gradient(90deg, var(--accent), var(--red));border-radius:3px;transition:width 0.6s var(--spring);}
+
+  input.qty-add{
+    width:70px;
+    background:rgba(255,255,255,0.35);
+    border:1.5px solid color-mix(in srgb, var(--red) 40%, var(--glass-border));color:var(--ink);
+    font-family:var(--mono);font-size:12.5px;padding:6px 7px;border-radius:10px;
+    text-align:right;transition:border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  [data-theme="dark"] input.qty-add{ background:rgba(0,0,0,0.25); }
+  input.qty-add:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);}
+  .empty{color:var(--ink-dim);font-size:12.5px;padding:22px;text-align:center;font-family:var(--font-system);}
+  .foot-note{color:var(--ink-dim);font-size:11px;text-align:center;margin-top:18px;}
+
+  /* ---------- Loading skeleton ---------- */
+  .skeleton-row td{ padding:12px 10px; }
+  .skeleton-bar{
+    height:12px;border-radius:6px;
+    background:linear-gradient(90deg, rgba(120,110,90,0.12) 25%, rgba(120,110,90,0.24) 50%, rgba(120,110,90,0.12) 75%);
+    background-size:200% 100%;
+    animation:shimmer 1.3s infinite;
+  }
+  [data-theme="dark"] .skeleton-bar{
+    background:linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.06) 75%);
+    background-size:200% 100%;
+  }
+  @keyframes shimmer{ to{ background-position:-200% 0; } }
+
+  /* Fade-in for freshly rendered content */
+  .fade-in{ animation:fadeIn 0.45s ease both; }
+  @keyframes fadeIn{
+    from{ opacity:0; transform:translateY(4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  h3.subhead{
+    margin:0;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;
+    color:var(--ink-dim);font-weight:700;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="masthead-title">
+      <div class="brand-mark">₹</div>
+      <div>
+        <h1>Portfolio Ledger</h1>
+        <div class="sub">Paste your holdings snapshot below to build the tables</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="stamp">Last parsed<br><span id="asof">&mdash;</span></div>
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button type="button" id="lightBtn" title="Light mode" aria-label="Light mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
+        <button type="button" id="darkBtn" title="Dark mode" aria-label="Dark mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Paste Holdings Data</h2><span class="tag">input</span></div>
+    <div class="panel-body">
+      <textarea id="rawInput" placeholder="Paste your holdings snapshot here — either the ₹-concatenated text or the tab-separated table copied straight from your broker's holdings screen. Both formats are auto-detected."></textarea>
+      <div class="btn-row">
+        <button class="primary" id="parseBtn"><span class="btn-spinner"></span><span class="btn-label">Build tables</span></button>
+        <button class="ghost" id="sampleBtn">Load sample</button>
+        <button class="ghost" id="shareBtn">Copy link to view on phone</button>
+      </div>
+      <div class="hint" id="parseMsg"></div>
+      <div class="hint">Your last pasted data is saved on this device automatically. Use "Copy link" to open the same tables on your phone or any other device — the data travels inside the link itself, nothing is uploaded anywhere.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>1 · Current Holdings</h2><span class="tag" id="holdCount"></span></div>
+    <div class="panel-body" style="overflow-x:auto;">
+      <table id="holdingsTable">
+        <thead><tr>
+          <th>Symbol</th><th>Qty</th><th>Buy Avg</th><th>Buy Value</th>
+          <th>LTP</th><th>Present Value</th><th>P&amp;L</th><th>P&amp;L %</th>
+        </tr></thead>
+        <tbody><tr><td colspan="8" class="empty">No data yet — paste your holdings above.</td></tr></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>2 · Sector Allocation</h2><span class="tag">by invested value</span></div>
+    <div class="panel-body" style="overflow-x:auto;">
+      <table id="sectorTable">
+        <thead><tr><th>Sector</th><th>Invested Value</th><th>Weightage</th></tr></thead>
+        <tbody><tr><td colspan="3" class="empty">Sector breakdown appears here after parsing.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>3 · Add Shares — Average Price Simulator</h2><span class="tag tag-red">what-if</span></div>
+    <div class="panel-body" style="overflow-x:auto;">
+      <table id="simTable">
+        <thead><tr>
+          <th>Symbol</th><th>Current Qty</th><th>Current Avg</th><th>LTP</th>
+          <th>Add Qty</th><th>New Qty</th><th>Avg Price Change</th><th>New Avg Price</th><th>New Buy Value</th>
+        </tr></thead>
+        <tbody><tr><td colspan="9" class="empty">Simulator appears here after parsing.</td></tr></tbody>
+      </table>
+      <div class="hint">Enter how many extra shares of a stock you'd buy today at its current LTP — the new average buy price updates live, starting from your recorded Buy Avg (not Buy Value ÷ Qty, which can drift from Buy Avg after a demerger, bonus issue, or split reallocates cost basis — Buy Avg is treated as the reliable per-share figure here).</div>
+
+      <div style="margin-top:22px;border-top:1px solid var(--glass-border);padding-top:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h3 class="subhead">Updated Sector Allocation (after adds)</h3>
+          <span class="tag tag-red">by invested value</span>
+        </div>
+        <table id="simSectorTable">
+          <thead><tr><th>Sector</th><th>Current Invested</th><th>Updated Invested</th><th>New Weightage</th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty">Add share quantities above to see the updated mix.</td></tr></tbody>
+        </table>
+        <div class="hint">Recalculates live as you change the Add Qty column above — shows how your sector mix shifts if you go through with those buys.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot-note">Sector tags are best-effort guesses for NSE/BSE symbols. Toggle light/dark above — your choice is remembered on this device.</div>
+</div>
+
+<script>
+// ---------- Theme handling ----------
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('lightBtn').classList.toggle('active', theme === 'light');
+  document.getElementById('darkBtn').classList.toggle('active', theme === 'dark');
+  try{ localStorage.setItem('ledger-theme', theme); }catch(e){}
+}
+(function initTheme(){
+  let saved = null;
+  try{ saved = localStorage.getItem('ledger-theme'); }catch(e){}
+  if(!saved){
+    saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  applyTheme(saved);
+})();
+document.getElementById('lightBtn').addEventListener('click', ()=>applyTheme('light'));
+document.getElementById('darkBtn').addEventListener('click', ()=>applyTheme('dark'));
+
+// ---------- Sector reference map (editable) ----------
+// Extend this as new symbols show up. Fallback = "Uncategorized".
+const SECTOR_MAP = {
+  "ARE&M": "Auto Components",
+  "DRREDDY": "Pharmaceuticals",
+  "FEDERALBNK": "Banking",
+  "HDFCBANK": "Banking",
+  "HEROMOTOCO": "Automobile",
+  "IDFCFIRSTB": "Banking",
+  "INDUSINDBK": "Banking",
+  "INFY": "IT Services",
+  "ITBEES": "IT Services",
+  "ITC": "FMCG",
+  "ITCHOTELS": "Hotels & Hospitality",
+  "JYOTHYLAB": "FMCG",
+  "MANAPPURAM": "NBFC (Gold Loan)",
+  "MUTHOOTFIN": "NBFC (Gold Loan)",
+  "NATCOPHARM": "Pharmaceuticals",
+  "SOUTHBANK": "Banking",
+  "TCS": "IT Services",
+  "TMCV": "Automobile",
+  "TMPV": "Automobile",
+  "ZYDUSLIFE": "Pharmaceuticals"
+};
+const SECTOR_OPTIONS = [...new Set(Object.values(SECTOR_MAP))].concat(["Uncategorized"]).sort();
+const sectorOverrides = {}; // symbol -> sector, user corrections this session
+
+const SAMPLE = `ARE&M
+  3
+5\t863.77\t4,318.85\t919.80\t4,599.00\t280.15\t+6.49%
+DRREDDY
+  2
+4\t1,215.59\t4,862.35\t1,187.30\t4,749.20\t-113.15\t-2.33%
+FEDERALBNK
+  2
+2\t193.82\t387.64\t350.75\t701.50\t313.86\t+80.97%
+HDFCBANK
+5\t823.81\t4,119.05\t725.80\t3,629.00\t-490.05\t-11.90%
+IDFCFIRSTB
+5\t69.63\t348.14\t85.80\t429.00\t80.86\t+23.23%
+INDUSINDBK
+  9
+12\t833.50\t10,002.00\t1,010.50\t12,126.00\t2,124.00\t+21.24%
+INFY
+9\t1,238.21\t11,143.90\t1,126.65\t10,139.85\t-1,004.05\t-9.01%
+ITBEES
+5\t31.23\t156.14\t33.84\t169.20\t13.06\t+8.36%
+ITC
+  15
+36\t346.87\t12,487.29\t268.60\t9,669.60\t-2,817.69\t-22.56%
+ITCHOTELS
+  1
+1\t589.43\t589.43\t166.55\t166.55\t-422.88\t-71.74%
+JYOTHYLAB
+  1
+8\t304.17\t2,433.35\t212.13\t1,697.04\t-736.31\t-30.26%
+MANAPPURAM
+  30
+30\t179.72\t5,391.57\t367.70\t11,031.00\t5,639.43\t+104.60%
+MUTHOOTFIN
+2\t2,914.20\t5,828.40\t3,200.00\t6,400.00\t571.60\t+9.81%
+NATCOPHARM
+  18
+28\t972.44\t27,228.35\t870.80\t24,382.40\t-2,845.95\t-10.45%
+SOUTHBANK
+  98
+137\t28.23\t3,867.03\t45.66\t6,255.42\t2,388.39\t+61.76%
+TCS
+  1
+6\t2,617.07\t15,702.40\t2,284.50\t13,707.00\t-1,995.40\t-12.71%
+TMCV
+  15
+15\t273.59\t4,103.78\t476.00\t7,140.00\t3,036.22\t+73.99%
+TMPV
+  22
+25\t505.57\t16,178.18\t312.80\t7,820.00\t-8,358.18\t-51.66%
+ZYDUSLIFE
+5\t926.97\t4,634.85\t1,097.10\t5,485.50\t850.65\t+18.35%`;
+
+let holdings = [];
+let addQtyState = []; // parallel array to `holdings`: extra qty the user is considering buying, per row
+
+function num(s){ return parseFloat(String(s).replace(/,/g,'')); }
+function inr(n, forceSign){
+  const sign = n < 0 ? '-' : (forceSign ? '+' : '');
+  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function pct(n, forceSign){
+  const sign = n < 0 ? '-' : (forceSign ? '+' : '');
+  return sign + Math.abs(n).toFixed(2) + '%';
+}
+
+// ---------- Format A: concatenated ₹-prefixed text, no separators ----------
+// SYMBOL QTY ₹buyAvg ₹buyValue ₹ltp ₹presentValue [+/-]₹pnl [+/-]pnl%
+// e.g. "ARE&M1₹760.00₹760.00₹921.70₹921.70+₹161.70+21.28%..."
+function parseHoldingsConcatenated(raw){
+  const re = /([A-Za-z&]+)(\d+)₹([\d,]+\.\d\d)₹([\d,]+\.\d\d)₹([\d,]+\.\d\d)₹([\d,]+\.\d\d)([+\-])₹([\d,]+\.\d\d)([+\-])([\d.]+)%/g;
+  const out = [];
+  let m;
+  while((m = re.exec(raw)) !== null){
+    out.push({
+      symbol: m[1].toUpperCase(),
+      qty: num(m[2]),
+      buyAvg: num(m[3]),
+      buyValue: num(m[4]),
+      ltp: num(m[5]),
+      presentValue: num(m[6]),
+      pnl: (m[7]==='-'?-1:1) * num(m[8]),
+      pnlPct: (m[9]==='-'?-1:1) * num(m[10])
+    });
+  }
+  return out;
+}
+
+// ---------- Format B: tab/newline table copied from a broker's holdings screen ----------
+// Symbol sits on its own line. Some rows also show a smaller "T1" sub-quantity
+// on its own line just above the real quantity — that stray number is ignored.
+// After the symbol, whatever remains (tab- or space-separated, across one or more
+// lines) always ends in exactly these 7 fields in order:
+//   Qty, Buy Avg, Buy Value, LTP, Present Value, P&L, P&L%
+// Taking the LAST 7 tokens before the next symbol sidesteps the stray T1 number
+// regardless of how many extra lines/numbers precede the real row.
+function parseHoldingsTabular(raw){
+  const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const symbolRe = /^[A-Za-z&]+$/;
+  const blocks = [];
+  let current = null;
+  lines.forEach(line=>{
+    if(symbolRe.test(line)){
+      current = {symbol: line.toUpperCase(), tokens: []};
+      blocks.push(current);
+    } else if(current){
+      let parts = line.split(/\t+|\s{2,}/).map(s=>s.trim()).filter(Boolean);
+      if(!parts.length) parts = line.split(/\s+/).filter(Boolean);
+      current.tokens.push(...parts);
+    }
+  });
+  const out = [];
+  blocks.forEach(b=>{
+    if(b.tokens.length >= 7){
+      const t = b.tokens.slice(-7);
+      out.push({
+        symbol: b.symbol,
+        qty: num(t[0]),
+        buyAvg: num(t[1]),
+        buyValue: num(t[2]),
+        ltp: num(t[3]),
+        presentValue: num(t[4]),
+        pnl: num(t[5]),
+        pnlPct: num(t[6])
+      });
+    }
+  });
+  return out;
+}
+
+// Auto-detect which format was pasted and parse accordingly.
+function parseHoldings(raw){
+  if(raw.indexOf('₹') !== -1){
+    return parseHoldingsConcatenated(raw);
+  }
+  return parseHoldingsTabular(raw);
+}
+
+function sectorFor(symbol){
+  return sectorOverrides[symbol] || SECTOR_MAP[symbol] || "Uncategorized";
+}
+
+function renderHoldings(){
+  const tbody = document.querySelector('#holdingsTable tbody');
+  const tfoot = document.querySelector('#holdingsTable tfoot');
+  document.getElementById('holdCount').textContent = holdings.length + ' stocks';
+  if(!holdings.length){
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No data yet — paste your holdings above.</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = holdings.map(h => `
+    <tr class="fade-in">
+      <td class="sym">${h.symbol}</td>
+      <td>${h.qty}</td>
+      <td>${inr(h.buyAvg)}</td>
+      <td>${inr(h.buyValue)}</td>
+      <td>${inr(h.ltp)}</td>
+      <td>${inr(h.presentValue)}</td>
+      <td class="${h.pnl>=0?'up':'down'}">${inr(h.pnl, true)}</td>
+      <td class="${h.pnlPct>=0?'up':'down'}">${pct(h.pnlPct, true)}</td>
+    </tr>`).join('');
+  const totBuy = holdings.reduce((a,h)=>a+h.buyValue,0);
+  const totPresent = holdings.reduce((a,h)=>a+h.presentValue,0);
+  const totPnl = totPresent - totBuy;
+  const totPnlPct = totBuy ? (totPnl/totBuy*100) : 0;
+  tfoot.innerHTML = `<tr>
+    <td>Total</td><td></td><td></td><td>${inr(totBuy)}</td><td></td>
+    <td>${inr(totPresent)}</td>
+    <td class="${totPnl>=0?'up':'down'}">${inr(totPnl, true)}</td>
+    <td class="${totPnlPct>=0?'up':'down'}">${pct(totPnlPct, true)}</td>
+  </tr>`;
+}
+
+function renderSectors(){
+  const tbody = document.querySelector('#sectorTable tbody');
+  if(!holdings.length){
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Sector breakdown appears here after parsing.</td></tr>';
+    return;
+  }
+  const totals = {};
+  const totalAll = holdings.reduce((a,h)=>a+h.buyValue,0);
+  holdings.forEach(h=>{
+    const s = sectorFor(h.symbol);
+    totals[s] = (totals[s]||0) + h.buyValue;
+  });
+  const rows = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const maxW = Math.max(...rows.map(r=>r[1]/totalAll*100));
+  tbody.innerHTML = rows.map(([sector,val])=>{
+    const w = totalAll ? (val/totalAll*100) : 0;
+    return `<tr class="fade-in">
+      <td class="sector-name">${sector}</td>
+      <td>${inr(val)}</td>
+      <td><div class="barcell">
+        <span>${w.toFixed(1)}%</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(w/maxW*100).toFixed(0)}%"></div></div>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function avgChangeHTML(delta){
+  if(Math.abs(delta) < 0.005) return '<span style="color:var(--ink-dim);">&mdash; no change</span>';
+  if(delta > 0) return `<span class="down">&#9650; +${inr(delta)}</span>`;
+  return `<span class="up">&#9660; ${inr(delta)}</span>`;
+}
+
+function renderSimulator(){
+  const tbody = document.querySelector('#simTable tbody');
+  addQtyState = holdings.map(()=>0);
+  if(!holdings.length){
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Simulator appears here after parsing.</td></tr>';
+    renderSimSectors();
+    return;
+  }
+  tbody.innerHTML = holdings.map((h,i)=>`
+    <tr class="fade-in" data-i="${i}">
+      <td class="sym">${h.symbol}</td>
+      <td>${h.qty}</td>
+      <td>${inr(h.buyAvg)}</td>
+      <td>${inr(h.ltp)}</td>
+      <td><input type="number" min="0" step="1" class="qty-add" data-i="${i}" placeholder="0"></td>
+      <td class="new-qty">${h.qty}</td>
+      <td class="avg-change">${avgChangeHTML(0)}</td>
+      <td class="new-avg">${inr(h.buyAvg)}</td>
+      <td class="new-value">${inr(h.qty * h.buyAvg)}</td>
+    </tr>`).join('');
+
+  tbody.querySelectorAll('.qty-add').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const i = +e.target.dataset.i;
+      const h = holdings[i];
+      const addQty = Math.max(0, parseFloat(e.target.value) || 0);
+      const newQty = h.qty + addQty;
+      const newValue = (h.qty * h.buyAvg) + addQty * h.ltp;
+      const newAvg = newQty ? newValue / newQty : 0;
+      addQtyState[i] = addQty;
+      const row = e.target.closest('tr');
+      row.querySelector('.new-qty').textContent = newQty;
+      row.querySelector('.avg-change').innerHTML = avgChangeHTML(newAvg - h.buyAvg);
+      row.querySelector('.new-avg').textContent = inr(newAvg);
+      row.querySelector('.new-value').textContent = inr(newValue);
+      renderSimSectors();
+    });
+  });
+
+  renderSimSectors();
+}
+
+// Shows how sector weightage (by invested value) would shift if the Add Qty
+// entries in the simulator above were actually bought at current LTP.
+function renderSimSectors(){
+  const tbody = document.querySelector('#simSectorTable tbody');
+  if(!holdings.length){
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Add share quantities above to see the updated mix.</td></tr>';
+    return;
+  }
+  const current = {};
+  const updated = {};
+  holdings.forEach((h,i)=>{
+    const s = sectorFor(h.symbol);
+    const addQty = addQtyState[i] || 0;
+    const newInvested = h.buyValue + addQty * h.ltp;
+    current[s] = (current[s]||0) + h.buyValue;
+    updated[s] = (updated[s]||0) + newInvested;
+  });
+  const totalUpdated = Object.values(updated).reduce((a,v)=>a+v,0);
+  const sectors = Object.keys(updated).sort((a,b)=>updated[b]-updated[a]);
+  tbody.innerHTML = sectors.map(s=>{
+    const cur = current[s]||0;
+    const upd = updated[s]||0;
+    const w = totalUpdated ? (upd/totalUpdated*100) : 0;
+    const changed = Math.abs(upd-cur) > 0.005;
+    return `<tr>
+      <td class="sector-name">${s}</td>
+      <td>${inr(cur)}</td>
+      <td class="${changed?'up':''}">${inr(upd)}</td>
+      <td>${w.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderAll(){
+  renderHoldings();
+  renderSectors();
+  renderSimulator();
+}
+
+// ---------- Skeleton loading state ----------
+function skeletonRow(cols){
+  return '<tr class="skeleton-row">' +
+    Array.from({length:cols}).map(()=>'<td><div class="skeleton-bar"></div></td>').join('') +
+    '</tr>';
+}
+function showSkeletons(){
+  document.querySelector('#holdingsTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(8)).join('');
+  document.querySelector('#holdingsTable tfoot').innerHTML = '';
+  document.querySelector('#sectorTable tbody').innerHTML = Array.from({length:3}).map(()=>skeletonRow(3)).join('');
+  document.querySelector('#simTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(9)).join('');
+  document.querySelector('#simSectorTable tbody').innerHTML = Array.from({length:3}).map(()=>skeletonRow(4)).join('');
+}
+
+const parseBtn = document.getElementById('parseBtn');
+
+// ---------- Persistence: last pasted data + shareable cross-device link ----------
+const STORAGE_KEY = 'ledger-last-raw';
+
+function saveLastData(raw){
+  try{ localStorage.setItem(STORAGE_KEY, raw); }catch(e){}
+}
+function loadLastData(){
+  try{ return localStorage.getItem(STORAGE_KEY); }catch(e){ return null; }
+}
+// btoa/atob only handle Latin1, so the ₹ symbol and similar need this escape hop.
+function encodeForLink(raw){
+  return btoa(unescape(encodeURIComponent(raw)));
+}
+function decodeFromLink(encoded){
+  return decodeURIComponent(escape(atob(encoded)));
+}
+function getDataFromUrl(){
+  const hash = window.location.hash;
+  if(hash.startsWith('#data=')){
+    try{ return decodeFromLink(decodeURIComponent(hash.slice(6))); }
+    catch(e){ return null; }
+  }
+  return null;
+}
+
+parseBtn.addEventListener('click', ()=>{
+  const raw = document.getElementById('rawInput').value.trim();
+  const msg = document.getElementById('parseMsg');
+  if(!raw){ msg.textContent = 'Paste your holdings text first.'; return; }
+
+  parseBtn.classList.add('loading');
+  parseBtn.disabled = true;
+  msg.textContent = '';
+  showSkeletons();
+
+  // Brief, deliberate pause so the shimmer is visible — this is instant math,
+  // but a hard cut from skeleton to full tables reads as a glitch, not speed.
+  setTimeout(()=>{
+    const parsed = parseHoldings(raw);
+    parseBtn.classList.remove('loading');
+    parseBtn.disabled = false;
+    if(!parsed.length){
+      msg.textContent = "Couldn't find any rows in that format — check it matches Symbol/Qty/Buy Avg/Buy Value/LTP/Present Value/P&L/P&L% with no separators.";
+      renderAll();
+      return;
+    }
+    holdings = parsed;
+    saveLastData(raw);
+    msg.textContent = `Parsed ${parsed.length} holdings. Saved on this device.`;
+    document.getElementById('asof').textContent = new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+    renderAll();
+  }, 550);
+});
+
+document.getElementById('sampleBtn').addEventListener('click', ()=>{
+  document.getElementById('rawInput').value = SAMPLE;
+});
+
+document.getElementById('shareBtn').addEventListener('click', async ()=>{
+  const raw = document.getElementById('rawInput').value.trim();
+  const msg = document.getElementById('parseMsg');
+  if(!raw){ msg.textContent = 'Paste and build your holdings first, then copy the link.'; return; }
+  const url = window.location.origin + window.location.pathname + '#data=' + encodeURIComponent(encodeForLink(raw));
+  try{
+    await navigator.clipboard.writeText(url);
+    msg.textContent = 'Link copied — open it on your phone to see the same tables.';
+  }catch(e){
+    // Clipboard API can fail without a user-gesture context in some browsers;
+    // fall back to showing the link so it can be copied by hand.
+    msg.textContent = 'Copy this link: ' + url;
+  }
+});
+
+// Load order: a shared link's data takes priority (that's an explicit share),
+// then whatever was last built on this device, then the bundled sample.
+window.addEventListener('DOMContentLoaded', ()=>{
+  const fromLink = getDataFromUrl();
+  const fromStorage = loadLastData();
+  const initial = fromLink || fromStorage || SAMPLE;
+  document.getElementById('rawInput').value = initial;
+  parseBtn.click();
+});
+</script>
+</body>
+</html>
