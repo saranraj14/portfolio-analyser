@@ -200,7 +200,7 @@
     display:none;
   }
   button.primary.loading .btn-spinner{ display:inline-block; }
-  button.primary.loading .btn-label::after{ content:"Building…"; }
+  button.primary.loading .btn-label::after{ content:"Building..."; }
   button.primary.loading .btn-label{ font-size:0; }
   button.primary.loading .btn-label::after{ font-size:13px; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
@@ -383,7 +383,17 @@
   </div>
 
   <div class="panel">
-    <div class="panel-head"><h2>3 · Add Shares — Average Price Simulator</h2><span class="tag tag-red">what-if</span></div>
+    <div class="panel-head"><h2>3 · Market Cap Allocation</h2><span class="tag">Large / Mid / Small</span></div>
+    <div class="panel-body" style="overflow-x:auto;">
+      <div class="pie-wrap" id="capWrap">
+        <div class="empty">Market cap breakdown appears here after parsing.</div>
+      </div>
+      <div class="hint">Tiers follow AMFI's latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding's approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>4 · Add Shares — Average Price Simulator</h2><span class="tag tag-red">what-if</span></div>
     <div class="panel-body" style="overflow-x:auto;">
       <table id="simTable">
         <thead><tr>
@@ -697,17 +707,16 @@ function donutSlicePath(cx, cy, rOuter, rInner, startAngle, endAngle){
     + `A ${rInner} ${rInner} 0 ${largeArc} 1 ${pi2.x.toFixed(2)} ${pi2.y.toFixed(2)} Z`;
 }
 
-function renderSectorPie(){
-  const wrap = document.getElementById('pieWrap');
-  if(!holdings.length){
-    wrap.innerHTML = '<div class="empty">Pie chart appears here after parsing.</div>';
-    return;
-  }
-  const { totals, totalAll } = getSectorTotals();
-  // Largest to smallest — same order as the table above it.
-  const rows = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-  if(!totalAll || !rows.length){
-    wrap.innerHTML = '<div class="empty">Pie chart appears here after parsing.</div>';
+// Generic donut renderer shared by every allocation chart on the page (sector,
+// market-cap tier, and any future grouping). `rows` is an already-ordered
+// array of [label, value] pairs — this function only draws, it never sorts,
+// so each caller controls its own ordering logic. `idPrefix` namespaces the
+// SVG gradient/filter ids so multiple donuts can coexist on one page without
+// id collisions.
+function renderDonut(wrapId, rows, totalAll, colorFn, totalLabel, idPrefix){
+  const wrap = document.getElementById(wrapId);
+  if(!rows.length || !totalAll){
+    wrap.innerHTML = '<div class="empty">Chart appears here after parsing.</div>';
     return;
   }
 
@@ -719,13 +728,13 @@ function renderSectorPie(){
   const gradients = [];
   const slicesSVG = [];
   const legendRows = [];
-  rows.forEach(([sector, val], i)=>{
-    const color = colorForSector(sector);
+  rows.forEach(([label, val], i)=>{
+    const color = colorFn(label);
     const pctShare = val/totalAll*100;
     const barWidth = maxShare ? (pctShare/maxShare*100) : 0;
     const sweep = (val/totalAll) * 360;
-    const safeSector = String(sector).replace(/"/g, '&quot;');
-    const gradId = `secGrad${i}`;
+    const safeLabel = String(label).replace(/"/g, '&quot;');
+    const gradId = `${idPrefix}Grad${i}`;
     // Light-to-dark diagonal gradient per slice = the "bevelled ring" 3D look.
     gradients.push(`<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="${shadeColor(color, 22)}"/>
@@ -734,8 +743,8 @@ function renderSectorPie(){
     </linearGradient>`);
 
     if(rows.length === 1){
-      // A single sector: a full ring, no bisector to pop toward.
-      slicesSVG.push(`<circle class="pie-slice" data-sector="${safeSector}" cx="${cx}" cy="${cy}" r="${(rOuter+rInner)/2}" fill="none" stroke="url(#${gradId})" stroke-width="${rOuter-rInner}"><title>${sector}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></circle>`);
+      // A single group: a full ring, no bisector to pop toward.
+      slicesSVG.push(`<circle class="pie-slice" data-key="${idPrefix}-${safeLabel}" cx="${cx}" cy="${cy}" r="${(rOuter+rInner)/2}" fill="none" stroke="url(#${gradId})" stroke-width="${rOuter-rInner}"><title>${label}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></circle>`);
     } else {
       const start = angle;
       const end = angle + sweep;
@@ -743,13 +752,13 @@ function renderSectorPie(){
       const dirRad = (mid - 90) * Math.PI / 180;
       const tx = (Math.cos(dirRad) * POP).toFixed(2);
       const ty = (Math.sin(dirRad) * POP).toFixed(2);
-      slicesSVG.push(`<path class="pie-slice" data-sector="${safeSector}" style="--tx:${tx}px;--ty:${ty}px" d="${donutSlicePath(cx, cy, rOuter, rInner, start, end)}" fill="url(#${gradId})"><title>${sector}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></path>`);
+      slicesSVG.push(`<path class="pie-slice" data-key="${idPrefix}-${safeLabel}" style="--tx:${tx}px;--ty:${ty}px" d="${donutSlicePath(cx, cy, rOuter, rInner, start, end)}" fill="url(#${gradId})"><title>${label}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></path>`);
       angle = end;
     }
     legendRows.push(`
-      <div class="pie-legend-row" data-sector="${safeSector}">
+      <div class="pie-legend-row" data-key="${idPrefix}-${safeLabel}">
         <span class="pie-swatch" style="background:${color}"></span>
-        <span class="pie-legend-name">${sector}</span>
+        <span class="pie-legend-name">${label}</span>
         <span class="pie-legend-bar-track"><span class="pie-legend-bar-fill" style="width:${barWidth.toFixed(0)}%;background:${color};"></span></span>
         <span class="pie-legend-val">${inr(val)}</span>
         <span class="pie-legend-pct">${pctShare.toFixed(1)}%</span>
@@ -761,19 +770,19 @@ function renderSectorPie(){
       <svg class="pie-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
         <defs>
           ${gradients.join('')}
-          <filter id="donutShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <filter id="${idPrefix}DonutShadow" x="-30%" y="-30%" width="160%" height="160%">
             <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="rgba(0,0,0,0.28)"/>
           </filter>
-          <radialGradient id="glossHighlight" cx="50%" cy="18%" r="55%">
+          <radialGradient id="${idPrefix}GlossHighlight" cx="50%" cy="18%" r="55%">
             <stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>
             <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
           </radialGradient>
         </defs>
-        <g filter="url(#donutShadow)">${slicesSVG.join('')}</g>
-        <circle cx="${cx}" cy="${cy}" r="${rOuter+2}" fill="url(#glossHighlight)" style="mix-blend-mode:overlay;pointer-events:none;"/>
+        <g filter="url(#${idPrefix}DonutShadow)">${slicesSVG.join('')}</g>
+        <circle cx="${cx}" cy="${cy}" r="${rOuter+2}" fill="url(#${idPrefix}GlossHighlight)" style="mix-blend-mode:overlay;pointer-events:none;"/>
       </svg>
       <div class="pie-total-below">
-        <div class="pie-center-label">Total Invested</div>
+        <div class="pie-center-label">${totalLabel}</div>
         <div class="pie-center-value">${inr(totalAll)}</div>
       </div>
     </div>
@@ -782,18 +791,88 @@ function renderSectorPie(){
 
   // Bidirectional hover: hovering a slice pops it out and highlights its legend
   // row; hovering the legend row does the same to the slice. Both directions
-  // share one handler so they can never drift out of sync.
-  const setActive = (sector, active)=>{
-    wrap.querySelectorAll(`[data-sector="${sector.replace(/"/g,'\\"')}"]`).forEach(el=>{
+  // share one handler so they can never drift out of sync. `data-key` is
+  // namespaced per chart, so this never cross-links between two donuts.
+  const setActive = (key, active)=>{
+    wrap.querySelectorAll(`[data-key="${key.replace(/"/g,'\\"')}"]`).forEach(el=>{
       el.classList.toggle('pop', active);
     });
   };
-  wrap.querySelectorAll('[data-sector]').forEach(el=>{
-    el.addEventListener('mouseenter', ()=>setActive(el.dataset.sector, true));
-    el.addEventListener('mouseleave', ()=>setActive(el.dataset.sector, false));
+  wrap.querySelectorAll('[data-key]').forEach(el=>{
+    el.addEventListener('mouseenter', ()=>setActive(el.dataset.key, true));
+    el.addEventListener('mouseleave', ()=>setActive(el.dataset.key, false));
   });
 }
 
+function renderSectorPie(){
+  const { totals, totalAll } = getSectorTotals();
+  // Largest to smallest — same order as the table above it.
+  const rows = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  renderDonut('pieWrap', rows, totalAll, colorForSector, 'Total Invested', 'sec');
+}
+
+// ---------- Market cap tier map (Large / Mid / Small) ----------
+// This is a manually-maintained snapshot, not a live feed — there is no
+// reliable way to fetch live Indian market-cap data from pure client-side
+// JS. NSE's own API blocks direct cross-origin browser requests, and every
+// CORS-friendly alternative needs a personal API key, which would sit
+// exposed in this public repo's source. So this works the same way
+// SECTOR_MAP does: values sourced and checked periodically, not real-time.
+// Tier boundaries follow AMFI's most recent categorisation (~mid-2026):
+// Large cap ≥ ₹1,06,300 Cr; Mid cap ₹33,500–1,06,300 Cr; Small cap below that.
+const MARKET_CAP_CR = {
+  "ARE&M": 16000,
+  "DRREDDY": 110000,
+  "FEDERALBNK": 48000,
+  "HDFCBANK": 1450000,
+  "IDFCFIRSTB": 75440,
+  "INDUSINDBK": 70000,
+  "INFY": 620000,
+  "ITC": 520000,
+  "ITCHOTELS": 46000,
+  "JYOTHYLAB": 10300,
+  "MANAPPURAM": 27000,
+  "MUTHOOTFIN": 122000,
+  "NATCOPHARM": 15100,
+  "SOUTHBANK": 9500,
+  "TCS": 1150000,
+  "TMCV": 85000,
+  "TMPV": 290000,
+  "ZYDUSLIFE": 95000
+  // ITBEES is an ETF (a basket of IT stocks), not an individual company —
+  // it has no market cap of its own, so it's deliberately left out and
+  // tierForSymbol() routes it to an "ETF / Fund" bucket instead.
+};
+const CAP_TIER_ORDER = ["Large Cap", "Mid Cap", "Small Cap", "ETF / Fund"];
+const CAP_TIER_COLORS = {
+  "Large Cap": "#0066B1",   // BMW blue — same "steady/blue-chip" association as Banking
+  "Mid Cap": "#F0B429",     // amber — the in-between tier
+  "Small Cap": "#E7222E",   // BMW red — highest volatility/risk tier
+  "ETF / Fund": "#9E9E9E"   // neutral gray — not a single-company risk tier
+};
+function tierForSymbol(symbol){
+  if(!(symbol in MARKET_CAP_CR)) return "ETF / Fund";
+  const cr = MARKET_CAP_CR[symbol];
+  if(cr >= 106300) return "Large Cap";
+  if(cr >= 33500) return "Mid Cap";
+  return "Small Cap";
+}
+function getMarketCapTotals(){
+  const totals = {};
+  const totalAll = holdings.reduce((a,h)=>a+h.buyValue,0);
+  holdings.forEach(h=>{
+    const tier = tierForSymbol(h.symbol);
+    totals[tier] = (totals[tier]||0) + h.buyValue;
+  });
+  return { totals, totalAll };
+}
+function renderMarketCapPie(){
+  const { totals, totalAll } = getMarketCapTotals();
+  // Fixed conventional order (Large → Mid → Small → ETF), not sorted by
+  // value — for a cap-size chart, reading order matters more than magnitude.
+  const rows = CAP_TIER_ORDER.filter(t => totals[t] !== undefined).map(t => [t, totals[t]]);
+  renderDonut('capWrap', rows, totalAll, (t)=>CAP_TIER_COLORS[t] || '#9E9E9E', 'Total Invested', 'cap');
+}
 
 function avgChangeHTML(delta){
   if(Math.abs(delta) < 0.005) return '<span style="color:var(--ink-dim);">&mdash; no change</span>';
@@ -879,6 +958,7 @@ function renderSimSectors(){
 function renderAll(){
   renderHoldings();
   renderSectorPie();
+  renderMarketCapPie();
   renderSimulator();
 }
 
