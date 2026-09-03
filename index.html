@@ -200,7 +200,7 @@
     display:none;
   }
   button.primary.loading .btn-spinner{ display:inline-block; }
-  button.primary.loading .btn-label::after{ content:"Building…"; }
+  button.primary.loading .btn-label::after{ content:"Building\u2026"; }
   button.primary.loading .btn-label{ font-size:0; }
   button.primary.loading .btn-label::after{ font-size:13px; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
@@ -223,18 +223,12 @@
   tbody tr:hover td{background:rgba(0,0,0,0.03);}
   [data-theme="dark"] tbody tr:hover td{background:rgba(255,255,255,0.05);}
   td.sym{font-family:var(--font-system);font-weight:700;letter-spacing:0.01em;color:var(--accent);}
-  td.sector-name{font-family:var(--font-system);color:var(--ink);font-weight:600;}
   .up{color:var(--green);font-weight:600;}
   .down{color:var(--red);font-weight:700;}
   tfoot td{
     border-top:2px solid var(--accent);font-weight:700;
     color:var(--accent);background:var(--glass-bg-strong);
   }
-
-  .barcell{display:flex;align-items:center;gap:10px;justify-content:flex-end;}
-  .bar-track{flex:1;max-width:140px;height:6px;background:rgba(120,110,90,0.18);border-radius:3px;overflow:hidden;}
-  [data-theme="dark"] .bar-track{ background:rgba(255,255,255,0.1); }
-  .bar-fill{height:100%;background:linear-gradient(90deg, var(--accent), var(--red));border-radius:3px;transition:width 0.6s var(--spring);}
 
   input.qty-add{
     width:70px;
@@ -273,8 +267,60 @@
     margin:0;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;
     color:var(--ink-dim);font-weight:700;
   }
+
+  /* ---------- Sector pie chart ---------- */
+  .pie-wrap{
+    display:flex;align-items:flex-start;gap:32px;flex-wrap:wrap;justify-content:center;
+  }
+  .pie-svg-holder{
+    display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:220px;
+  }
+  .pie-svg{ display:block; }
+  .pie-total-below{
+    text-align:center;margin-top:14px;
+  }
+  .pie-center-label{
+    font-family:var(--mono);font-size:9px;text-transform:uppercase;
+    letter-spacing:0.05em;color:var(--ink-dim);margin-bottom:3px;
+  }
+  .pie-center-value{
+    font-family:var(--font-system);font-size:16px;font-weight:700;color:var(--ink);
+    line-height:1.25;
+  }
+  .pie-slice{
+    transition:transform 0.3s var(--spring), filter 0.25s ease;
+    cursor:pointer;
+  }
+  .pie-slice.pop{ transform:translate(var(--tx), var(--ty)); filter:brightness(1.08); }
+  .pie-legend{ display:flex;flex-direction:column;gap:9px;min-width:420px;flex:1; }
+  .pie-legend-row{
+    display:flex;align-items:center;gap:14px;font-size:12.5px;
+    padding:6px 8px;border-bottom:1px solid rgba(120,110,90,0.1);
+    border-radius:8px;cursor:pointer;
+    transition:background 0.2s ease, transform 0.2s var(--spring);
+  }
+  .pie-legend-row.pop{ background:rgba(0,0,0,0.045); transform:translateX(3px); }
+  [data-theme="dark"] .pie-legend-row.pop{ background:rgba(255,255,255,0.08); }
+  [data-theme="dark"] .pie-legend-row{ border-bottom-color:rgba(255,255,255,0.06); }
+  .pie-legend-row:last-child{ border-bottom:none; }
+  .pie-swatch{ width:11px;height:11px;border-radius:3px;flex-shrink:0; }
+  .pie-legend-name{
+    font-family:var(--font-system);font-weight:600;color:var(--ink);
+    flex:0 0 160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .pie-legend-bar-track{
+    flex:1 1 auto;min-width:60px;height:7px;border-radius:4px;
+    background:rgba(120,110,90,0.18);overflow:hidden;display:inline-block;
+  }
+  [data-theme="dark"] .pie-legend-bar-track{ background:rgba(255,255,255,0.1); }
+  .pie-legend-bar-fill{
+    display:block;height:100%;border-radius:4px;transition:width 0.6s var(--spring);
+  }
+  .pie-legend-val{ font-family:var(--mono);color:var(--ink-dim);font-size:11.5px;flex:0 0 100px;text-align:right; }
+  .pie-legend-pct{ font-family:var(--mono);font-weight:700;color:var(--ink);flex:0 0 52px;text-align:right; }
 </style>
 </head>
+
 <body>
 <div class="wrap">
 
@@ -330,10 +376,9 @@
   <div class="panel">
     <div class="panel-head"><h2>2 · Sector Allocation</h2><span class="tag">by invested value</span></div>
     <div class="panel-body" style="overflow-x:auto;">
-      <table id="sectorTable">
-        <thead><tr><th>Sector</th><th>Invested Value</th><th>Weightage</th></tr></thead>
-        <tbody><tr><td colspan="3" class="empty">Sector breakdown appears here after parsing.</td></tr></tbody>
-      </table>
+      <div class="pie-wrap" id="pieWrap">
+        <div class="empty">Sector breakdown appears here after parsing.</div>
+      </div>
     </div>
   </div>
 
@@ -411,6 +456,32 @@ const SECTOR_MAP = {
 };
 const SECTOR_OPTIONS = [...new Set(Object.values(SECTOR_MAP))].concat(["Uncategorized"]).sort();
 const sectorOverrides = {}; // symbol -> sector, user corrections this session
+
+// Fixed per-sector colors — chosen to be intuitive (finance=blue, motors=red,
+// health=violet, gold-lending=mustard, etc.) and mutually distinct, not derived
+// from rank or sort order, so a sector is always the same color everywhere on
+// the page regardless of how the portfolio shuffles.
+const SECTOR_COLORS = {
+  "Banking": "#0066B1",            // BMW blue — finance/trust
+  "Automobile": "#E7222E",         // BMW red — motors
+  "Auto Components": "#F2994A",    // warm orange — adjacent to Automobile, still distinct
+  "IT Services": "#009688",        // teal — tech convention
+  "Pharmaceuticals": "#7C4DFF",    // violet — health, kept away from green/red (P&L colors)
+  "FMCG": "#F0B429",               // amber — consumer goods
+  "NBFC (Gold Loan)": "#B8860B",   // dark goldenrod — literally gold-backed lending
+  "Hotels & Hospitality": "#E0559E", // magenta/pink — hospitality, leisure
+  "Uncategorized": "#9E9E9E"       // neutral gray
+};
+// Any sector not in the map above still needs a stable color — hash the name
+// to a deterministic index into this fallback palette so it's consistent
+// across rebuilds without needing a code change for every future new sector.
+const FALLBACK_PALETTE = ["#3F51B5","#00838F","#8D6E63","#5D4037","#455A64","#AD1457","#6D4C41","#00695C"];
+function colorForSector(name){
+  if(SECTOR_COLORS[name]) return SECTOR_COLORS[name];
+  let hash = 0;
+  for(let i=0;i<name.length;i++){ hash = (hash*31 + name.charCodeAt(i)) >>> 0; }
+  return FALLBACK_PALETTE[hash % FALLBACK_PALETTE.length];
+}
 
 const SAMPLE = `ARE&M
   3
@@ -585,32 +656,144 @@ function renderHoldings(){
   </tr>`;
 }
 
-function renderSectors(){
-  const tbody = document.querySelector('#sectorTable tbody');
-  if(!holdings.length){
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">Sector breakdown appears here after parsing.</td></tr>';
-    return;
-  }
+// Shared by the sector table and the pie chart, so both always agree on the numbers.
+function getSectorTotals(){
   const totals = {};
   const totalAll = holdings.reduce((a,h)=>a+h.buyValue,0);
   holdings.forEach(h=>{
     const s = sectorFor(h.symbol);
     totals[s] = (totals[s]||0) + h.buyValue;
   });
-  const rows = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-  const maxW = Math.max(...rows.map(r=>r[1]/totalAll*100));
-  tbody.innerHTML = rows.map(([sector,val])=>{
-    const w = totalAll ? (val/totalAll*100) : 0;
-    return `<tr class="fade-in">
-      <td class="sector-name">${sector}</td>
-      <td>${inr(val)}</td>
-      <td><div class="barcell">
-        <span>${w.toFixed(1)}%</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${(w/maxW*100).toFixed(0)}%"></div></div>
-      </div></td>
-    </tr>`;
-  }).join('');
+  return { totals, totalAll };
 }
+
+// ---------- Sector donut chart: largest to smallest, 3D-shaded, with a live-linked legend ----------
+function polarToXY(cx, cy, r, angleDeg){
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+// Lightens (positive percent) or darkens (negative percent) a hex color —
+// used to build the light-to-dark gradient that gives each donut slice its
+// beveled, slightly-3D look.
+function shadeColor(hex, percent){
+  const num = parseInt(hex.replace('#',''), 16);
+  let r = (num >> 16) & 0xFF, g = (num >> 8) & 0xFF, b = num & 0xFF;
+  const adj = Math.round(2.55 * percent);
+  r = Math.min(255, Math.max(0, r + adj));
+  g = Math.min(255, Math.max(0, g + adj));
+  b = Math.min(255, Math.max(0, b + adj));
+  return `rgb(${r},${g},${b})`;
+}
+function donutSlicePath(cx, cy, rOuter, rInner, startAngle, endAngle){
+  const largeArc = (endAngle - startAngle) <= 180 ? 0 : 1;
+  const po1 = polarToXY(cx, cy, rOuter, endAngle);
+  const po2 = polarToXY(cx, cy, rOuter, startAngle);
+  const pi1 = polarToXY(cx, cy, rInner, startAngle);
+  const pi2 = polarToXY(cx, cy, rInner, endAngle);
+  return `M ${po1.x.toFixed(2)} ${po1.y.toFixed(2)} `
+    + `A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${po2.x.toFixed(2)} ${po2.y.toFixed(2)} `
+    + `L ${pi1.x.toFixed(2)} ${pi1.y.toFixed(2)} `
+    + `A ${rInner} ${rInner} 0 ${largeArc} 1 ${pi2.x.toFixed(2)} ${pi2.y.toFixed(2)} Z`;
+}
+
+function renderSectorPie(){
+  const wrap = document.getElementById('pieWrap');
+  if(!holdings.length){
+    wrap.innerHTML = '<div class="empty">Pie chart appears here after parsing.</div>';
+    return;
+  }
+  const { totals, totalAll } = getSectorTotals();
+  // Largest to smallest — same order as the table above it.
+  const rows = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  if(!totalAll || !rows.length){
+    wrap.innerHTML = '<div class="empty">Pie chart appears here after parsing.</div>';
+    return;
+  }
+
+  const size = 220, cx = size/2, cy = size/2;
+  const rOuter = size/2 - 6, rInner = rOuter * 0.34;
+  const POP = 9; // px a slice shifts outward along its own bisector on hover
+  const maxShare = Math.max(...rows.map(([,v]) => v/totalAll*100));
+  let angle = 0;
+  const gradients = [];
+  const slicesSVG = [];
+  const legendRows = [];
+  rows.forEach(([sector, val], i)=>{
+    const color = colorForSector(sector);
+    const pctShare = val/totalAll*100;
+    const barWidth = maxShare ? (pctShare/maxShare*100) : 0;
+    const sweep = (val/totalAll) * 360;
+    const safeSector = String(sector).replace(/"/g, '&quot;');
+    const gradId = `secGrad${i}`;
+    // Light-to-dark diagonal gradient per slice = the "bevelled ring" 3D look.
+    gradients.push(`<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${shadeColor(color, 22)}"/>
+      <stop offset="55%" stop-color="${color}"/>
+      <stop offset="100%" stop-color="${shadeColor(color, -18)}"/>
+    </linearGradient>`);
+
+    if(rows.length === 1){
+      // A single sector: a full ring, no bisector to pop toward.
+      slicesSVG.push(`<circle class="pie-slice" data-sector="${safeSector}" cx="${cx}" cy="${cy}" r="${(rOuter+rInner)/2}" fill="none" stroke="url(#${gradId})" stroke-width="${rOuter-rInner}"><title>${sector}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></circle>`);
+    } else {
+      const start = angle;
+      const end = angle + sweep;
+      const mid = (start + end) / 2;
+      const dirRad = (mid - 90) * Math.PI / 180;
+      const tx = (Math.cos(dirRad) * POP).toFixed(2);
+      const ty = (Math.sin(dirRad) * POP).toFixed(2);
+      slicesSVG.push(`<path class="pie-slice" data-sector="${safeSector}" style="--tx:${tx}px;--ty:${ty}px" d="${donutSlicePath(cx, cy, rOuter, rInner, start, end)}" fill="url(#${gradId})"><title>${sector}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></path>`);
+      angle = end;
+    }
+    legendRows.push(`
+      <div class="pie-legend-row" data-sector="${safeSector}">
+        <span class="pie-swatch" style="background:${color}"></span>
+        <span class="pie-legend-name">${sector}</span>
+        <span class="pie-legend-bar-track"><span class="pie-legend-bar-fill" style="width:${barWidth.toFixed(0)}%;background:${color};"></span></span>
+        <span class="pie-legend-val">${inr(val)}</span>
+        <span class="pie-legend-pct">${pctShare.toFixed(1)}%</span>
+      </div>`);
+  });
+
+  wrap.innerHTML = `
+    <div class="pie-svg-holder fade-in">
+      <svg class="pie-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <defs>
+          ${gradients.join('')}
+          <filter id="donutShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="rgba(0,0,0,0.28)"/>
+          </filter>
+          <radialGradient id="glossHighlight" cx="50%" cy="18%" r="55%">
+            <stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>
+            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+          </radialGradient>
+        </defs>
+        <g filter="url(#donutShadow)">${slicesSVG.join('')}</g>
+        <circle cx="${cx}" cy="${cy}" r="${rOuter+2}" fill="url(#glossHighlight)" style="mix-blend-mode:overlay;pointer-events:none;"/>
+      </svg>
+      <div class="pie-total-below">
+        <div class="pie-center-label">Total Invested</div>
+        <div class="pie-center-value">${inr(totalAll)}</div>
+      </div>
+    </div>
+    <div class="pie-legend fade-in">${legendRows.join('')}</div>
+  `;
+
+  // Bidirectional hover: hovering a slice pops it out and highlights its legend
+  // row; hovering the legend row does the same to the slice. Both directions
+  // share one handler so they can never drift out of sync.
+  const setActive = (sector, active)=>{
+    wrap.querySelectorAll(`[data-sector="${sector.replace(/"/g,'\\"')}"]`).forEach(el=>{
+      el.classList.toggle('pop', active);
+    });
+  };
+  wrap.querySelectorAll('[data-sector]').forEach(el=>{
+    el.addEventListener('mouseenter', ()=>setActive(el.dataset.sector, true));
+    el.addEventListener('mouseleave', ()=>setActive(el.dataset.sector, false));
+  });
+}
+
 
 function avgChangeHTML(delta){
   if(Math.abs(delta) < 0.005) return '<span style="color:var(--ink-dim);">&mdash; no change</span>';
@@ -695,7 +878,7 @@ function renderSimSectors(){
 
 function renderAll(){
   renderHoldings();
-  renderSectors();
+  renderSectorPie();
   renderSimulator();
 }
 
@@ -708,7 +891,7 @@ function skeletonRow(cols){
 function showSkeletons(){
   document.querySelector('#holdingsTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(8)).join('');
   document.querySelector('#holdingsTable tfoot').innerHTML = '';
-  document.querySelector('#sectorTable tbody').innerHTML = Array.from({length:3}).map(()=>skeletonRow(3)).join('');
+  document.getElementById('pieWrap').innerHTML = '<div class="skeleton-bar" style="width:220px;height:220px;border-radius:50%;"></div>';
   document.querySelector('#simTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(9)).join('');
   document.querySelector('#simSectorTable tbody').innerHTML = Array.from({length:3}).map(()=>skeletonRow(4)).join('');
 }
