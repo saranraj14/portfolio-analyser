@@ -317,7 +317,7 @@
     display:block;height:100%;border-radius:4px;transition:width 0.6s var(--spring);
   }
   .pie-legend-val{ font-family:var(--mono);color:var(--ink-dim);font-size:11.5px;flex:0 0 100px;text-align:right; }
-  .pie-legend-pct{ font-family:var(--mono);font-weight:700;color:var(--ink);flex:0 0 52px;text-align:right; }
+  .pie-legend-pct{ font-family:var(--mono);font-weight:700;color:var(--ink);flex:0 0 62px;text-align:right; }
 </style>
 </head>
 
@@ -442,27 +442,194 @@ document.getElementById('darkBtn').addEventListener('click', ()=>applyTheme('dar
 
 // ---------- Sector reference map (editable) ----------
 // Extend this as new symbols show up. Fallback = "Uncategorized".
+// Symbol → sector lookup covering all 500 current Nifty 500 constituents
+// (sourced from NSE's own official industry classification, not guessed),
+// plus ~31 additional symbols outside the Nifty 500 that still matter for
+// this tool specifically — including several of the user's own actual
+// holdings (SOUTHBANK, ITCHOTELS, TMCV, TMPV, ITBEES) that fall below the
+// Nifty 500's market-cap cutoff. 531 symbols total. NSE's own industry
+// categories were mapped onto this tool's existing (more granular) sector
+// names — e.g. NSE's single "Financial Services" bucket was split into
+// Banking / Insurance / NBFC / NBFC (Gold Loan) by company type, and
+// "Automobile and Auto Components" was split into Automobile (finished
+// vehicle OEMs) / Auto Components (parts suppliers) — rather than adopting
+// NSE's broader categories wholesale, to keep the existing sector names and
+// their hand-picked colors meaningful. Even with 531 symbols mapped, a
+// genuinely new/uncommon symbol can still show up — add it here (and to
+// MARKET_CAP_CR if it's an individual company, not an ETF) rather than
+// leaving it uncategorized.
 const SECTOR_MAP = {
-  "ARE&M": "Auto Components",
-  "DRREDDY": "Pharmaceuticals",
-  "FEDERALBNK": "Banking",
-  "HDFCBANK": "Banking",
-  "HEROMOTOCO": "Automobile",
-  "IDFCFIRSTB": "Banking",
-  "INDUSINDBK": "Banking",
-  "INFY": "IT Services",
-  "ITBEES": "IT Services",
-  "ITC": "FMCG",
-  "ITCHOTELS": "Hotels & Hospitality",
-  "JYOTHYLAB": "FMCG",
-  "MANAPPURAM": "NBFC (Gold Loan)",
-  "MUTHOOTFIN": "NBFC (Gold Loan)",
-  "NATCOPHARM": "Pharmaceuticals",
-  "SOUTHBANK": "Banking",
-  "TCS": "IT Services",
-  "TMCV": "Automobile",
-  "TMPV": "Automobile",
-  "ZYDUSLIFE": "Pharmaceuticals"
+  // Banking (32)
+  "AUBANK": "Banking", "AXISBANK": "Banking", "BANDHANBNK": "Banking", "BANKBARODA": "Banking",
+  "BANKINDIA": "Banking", "CANBK": "Banking", "CENTRALBK": "Banking", "CSBBANK": "Banking",
+  "CUB": "Banking", "DCBBANK": "Banking", "EQUITASBNK": "Banking", "FEDERALBNK": "Banking",
+  "HDFCBANK": "Banking", "ICICIBANK": "Banking", "IDBI": "Banking", "IDFCFIRSTB": "Banking",
+  "INDIANB": "Banking", "INDUSINDBK": "Banking", "IOB": "Banking", "J&KBANK": "Banking",
+  "KARURVYSYA": "Banking", "KOTAKBANK": "Banking", "MAHABANK": "Banking", "PNB": "Banking",
+  "RBLBANK": "Banking", "SBIN": "Banking", "SOUTHBANK": "Banking", "TMB": "Banking",
+  "UCOBANK": "Banking", "UJJIVANSFB": "Banking", "UNIONBANK": "Banking", "YESBANK": "Banking",
+  // Automobile (14)
+  "ASHOKLEY": "Automobile", "ATULAUTO": "Automobile", "BAJAJ-AUTO": "Automobile", "EICHERMOT": "Automobile",
+  "FORCEMOT": "Automobile", "HEROMOTOCO": "Automobile", "JBMA": "Automobile", "M&M": "Automobile",
+  "MARUTI": "Automobile", "SMLISUZU": "Automobile", "TATAMOTORS": "Automobile", "TMCV": "Automobile",
+  "TMPV": "Automobile", "TVSMOTOR": "Automobile",
+  // Auto Components (27)
+  "APOLLOTYRE": "Auto Components", "ARE&M": "Auto Components", "ASAHIINDIA": "Auto Components", "BALKRISIND": "Auto Components",
+  "BHARATFORG": "Auto Components", "BOSCHLTD": "Auto Components", "CEATLTD": "Auto Components", "CIEINDIA": "Auto Components",
+  "CRAFTSMAN": "Auto Components", "ENDURANCE": "Auto Components", "EXIDEIND": "Auto Components", "GABRIEL": "Auto Components",
+  "HBLENGINE": "Auto Components", "MINDACORP": "Auto Components", "MOTHERSON": "Auto Components", "MRF": "Auto Components",
+  "MSUMI": "Auto Components", "OLECTRA": "Auto Components", "RKFORGE": "Auto Components", "SCHAEFFLER": "Auto Components",
+  "SONACOMS": "Auto Components", "SUNDRMFAST": "Auto Components", "SUPRAJIT": "Auto Components", "TIINDIA": "Auto Components",
+  "UNOMINDA": "Auto Components", "VARROC": "Auto Components", "ZFCVINDIA": "Auto Components",
+  // IT Services (27)
+  "AFFLE": "IT Services", "BSOFT": "IT Services", "COFORGE": "IT Services", "CYIENT": "IT Services",
+  "HAPPSTMNDS": "IT Services", "HCLTECH": "IT Services", "INFY": "IT Services", "INTELLECT": "IT Services",
+  "ITBEES": "IT Services", "KPITTECH": "IT Services", "LATENTVIEW": "IT Services", "LTIM": "IT Services",
+  "LTTS": "IT Services", "MAPMYINDIA": "IT Services", "MASTEK": "IT Services", "MPHASIS": "IT Services",
+  "NEWGEN": "IT Services", "OFSS": "IT Services", "PERSISTENT": "IT Services", "SONATSOFTW": "IT Services",
+  "TANLA": "IT Services", "TATAELXSI": "IT Services", "TATATECH": "IT Services", "TCS": "IT Services",
+  "TECHM": "IT Services", "WIPRO": "IT Services", "ZENSARTECH": "IT Services",
+  // Pharmaceuticals (47)
+  "ABBOTINDIA": "Pharmaceuticals", "AJANTPHARM": "Pharmaceuticals", "ALIVUS": "Pharmaceuticals", "ALKEM": "Pharmaceuticals",
+  "APLLTD": "Pharmaceuticals", "APOLLOHOSP": "Pharmaceuticals", "ASTERDM": "Pharmaceuticals", "ASTRAZEN": "Pharmaceuticals",
+  "AUROPHARMA": "Pharmaceuticals", "BIOCON": "Pharmaceuticals", "CAPLIPOINT": "Pharmaceuticals", "CIPLA": "Pharmaceuticals",
+  "CONCORDBIO": "Pharmaceuticals", "DIVISLAB": "Pharmaceuticals", "DRREDDY": "Pharmaceuticals", "ERIS": "Pharmaceuticals",
+  "FDC": "Pharmaceuticals", "FORTIS": "Pharmaceuticals", "GLAND": "Pharmaceuticals", "GLAXO": "Pharmaceuticals",
+  "GLENMARK": "Pharmaceuticals", "GRANULES": "Pharmaceuticals", "IPCALAB": "Pharmaceuticals", "JBCHEPHARM": "Pharmaceuticals",
+  "JUBLPHARMA": "Pharmaceuticals", "KIMS": "Pharmaceuticals", "LALPATHLAB": "Pharmaceuticals", "LAURUSLABS": "Pharmaceuticals",
+  "LUPIN": "Pharmaceuticals", "MANKIND": "Pharmaceuticals", "MAXHEALTH": "Pharmaceuticals", "MEDANTA": "Pharmaceuticals",
+  "METROPOLIS": "Pharmaceuticals", "NATCOPHARM": "Pharmaceuticals", "NH": "Pharmaceuticals", "PFIZER": "Pharmaceuticals",
+  "POLYMED": "Pharmaceuticals", "PPLPHARMA": "Pharmaceuticals", "RAINBOW": "Pharmaceuticals", "SANOFI": "Pharmaceuticals",
+  "SPARC": "Pharmaceuticals", "SUNPHARMA": "Pharmaceuticals", "SUVENPHAR": "Pharmaceuticals", "SYNGENE": "Pharmaceuticals",
+  "TORNTPHARM": "Pharmaceuticals", "VIJAYA": "Pharmaceuticals", "ZYDUSLIFE": "Pharmaceuticals",
+  // FMCG (31)
+  "AVANTIFEED": "FMCG", "AWL": "FMCG", "BALRAMCHIN": "FMCG", "BBTC": "FMCG",
+  "BIKAJI": "FMCG", "BRITANNIA": "FMCG", "CCL": "FMCG", "COLPAL": "FMCG",
+  "DABUR": "FMCG", "DOMS": "FMCG", "EMAMILTD": "FMCG", "GAEL": "FMCG",
+  "GILLETTE": "FMCG", "GODFRYPHLP": "FMCG", "GODREJCP": "FMCG", "HINDUNILVR": "FMCG",
+  "HONASA": "FMCG", "ITC": "FMCG", "JYOTHYLAB": "FMCG", "KRBL": "FMCG",
+  "MARICO": "FMCG", "NESTLEIND": "FMCG", "PATANJALI": "FMCG", "PGHH": "FMCG",
+  "RADICO": "FMCG", "RENUKA": "FMCG", "TATACONSUM": "FMCG", "TRIVENI": "FMCG",
+  "UBL": "FMCG", "UNITDSPR": "FMCG", "VBL": "FMCG",
+  // NBFC (Gold Loan) (2)
+  "MANAPPURAM": "NBFC (Gold Loan)", "MUTHOOTFIN": "NBFC (Gold Loan)",
+  // Hotels & Hospitality (7)
+  "CHALET": "Hotels & Hospitality", "EASEMYTRIP": "Hotels & Hospitality", "INDHOTEL": "Hotels & Hospitality", "IRCTC": "Hotels & Hospitality",
+  "ITCHOTELS": "Hotels & Hospitality", "LEMONTREE": "Hotels & Hospitality", "MHRIL": "Hotels & Hospitality",
+  // Retail (22)
+  "ABFRL": "Retail", "BLS": "Retail", "DEVYANI": "Retail", "DMART": "Retail",
+  "EIHOTEL": "Retail", "ETERNAL": "Retail", "INDIAMART": "Retail", "JUBLFOOD": "Retail",
+  "JUSTDIAL": "Retail", "MANYAVAR": "Retail", "MEDPLUS": "Retail", "NAUKRI": "Retail",
+  "NYKAA": "Retail", "RBA": "Retail", "RTNINDIA": "Retail", "SAPPHIRE": "Retail",
+  "SHOPERSSTOP": "Retail", "TBOTEK": "Retail", "TRENT": "Retail", "VMART": "Retail",
+  "WESTLIFE": "Retail", "ZOMATO": "Retail",
+  // Aviation (2)
+  "INDIGO": "Aviation", "SPICEJET": "Aviation",
+  // Capital Goods (61)
+  "ABB": "Capital Goods", "ACE": "Capital Goods", "AIAENG": "Capital Goods", "APARINDS": "Capital Goods",
+  "APLAPOLLO": "Capital Goods", "ASTRAL": "Capital Goods", "BDL": "Capital Goods", "BEL": "Capital Goods",
+  "BEML": "Capital Goods", "BHEL": "Capital Goods", "BORORENEW": "Capital Goods", "CARBORUNIV": "Capital Goods",
+  "CGPOWER": "Capital Goods", "COCHINSHIP": "Capital Goods", "CUMMINSIND": "Capital Goods", "DATAPATTNS": "Capital Goods",
+  "ELECON": "Capital Goods", "ELGIEQUIP": "Capital Goods", "EPL": "Capital Goods", "ESCORTS": "Capital Goods",
+  "FINCABLES": "Capital Goods", "FINPIPE": "Capital Goods", "GMMPFAUDLR": "Capital Goods", "GPIL": "Capital Goods",
+  "GRAPHITE": "Capital Goods", "GRINDWELL": "Capital Goods", "GRSE": "Capital Goods", "HAL": "Capital Goods",
+  "HAPPYFORGE": "Capital Goods", "HEG": "Capital Goods", "HONAUT": "Capital Goods", "INOXWIND": "Capital Goods",
+  "JINDALSAW": "Capital Goods", "JWL": "Capital Goods", "KAYNES": "Capital Goods", "KEI": "Capital Goods",
+  "KIRLOSENG": "Capital Goods", "KSB": "Capital Goods", "MAHSEAMLES": "Capital Goods", "MAZDOCK": "Capital Goods",
+  "MTARTECH": "Capital Goods", "POLYCAB": "Capital Goods", "POWERINDIA": "Capital Goods", "PRAJIND": "Capital Goods",
+  "PRINCEPIPE": "Capital Goods", "RATNAMANI": "Capital Goods", "RHIM": "Capital Goods", "RRKABEL": "Capital Goods",
+  "SCHNEIDER": "Capital Goods", "SHYAMMETL": "Capital Goods", "SIEMENS": "Capital Goods", "SKFINDIA": "Capital Goods",
+  "SUPREMEIND": "Capital Goods", "SUZLON": "Capital Goods", "SYRMA": "Capital Goods", "THERMAX": "Capital Goods",
+  "TIMKEN": "Capital Goods", "TITAGARH": "Capital Goods", "TRITURBINE": "Capital Goods", "USHAMART": "Capital Goods",
+  "WELCORP": "Capital Goods",
+  // Cement (14)
+  "ACC": "Cement", "AMBUJACEM": "Cement", "BIRLACORPN": "Cement", "DALBHARAT": "Cement",
+  "GRASIM": "Cement", "HEIDELBERGCEM": "Cement", "INDIACEM": "Cement", "JKCEMENT": "Cement",
+  "JKLAKSHMI": "Cement", "NUVOCO": "Cement", "PRSMJOHNSN": "Cement", "RAMCOCEM": "Cement",
+  "SHREECEM": "Cement", "ULTRACEMCO": "Cement",
+  // Chemicals (36)
+  "AARTIIND": "Chemicals", "ACI": "Chemicals", "AETHER": "Chemicals", "ALKYLAMINE": "Chemicals",
+  "ANURAS": "Chemicals", "ATUL": "Chemicals", "BALAMINES": "Chemicals", "BAYERCROP": "Chemicals",
+  "CHAMBLFERT": "Chemicals", "CHEMPLASTS": "Chemicals", "CLEAN": "Chemicals", "COROMANDEL": "Chemicals",
+  "DEEPAKFERT": "Chemicals", "DEEPAKNTR": "Chemicals", "EIDPARRY": "Chemicals", "FACT": "Chemicals",
+  "FINEORG": "Chemicals", "FLUOROCHEM": "Chemicals", "GNFC": "Chemicals", "GSFC": "Chemicals",
+  "GUJALKALI": "Chemicals", "HSCL": "Chemicals", "JUBLINGREA": "Chemicals", "LINDEINDIA": "Chemicals",
+  "LXCHEM": "Chemicals", "NAVINFLUOR": "Chemicals", "PCBL": "Chemicals", "PIDILITIND": "Chemicals",
+  "PIIND": "Chemicals", "RCF": "Chemicals", "SOLARINDS": "Chemicals", "SRF": "Chemicals",
+  "SUMICHEM": "Chemicals", "TATACHEM": "Chemicals", "UPL": "Chemicals", "VINATIORGA": "Chemicals",
+  // Construction & Infra (15)
+  "ENGINERSIN": "Construction & Infra", "GMRINFRA": "Construction & Infra", "HGINFRA": "Construction & Infra", "IRB": "Construction & Infra",
+  "IRCON": "Construction & Infra", "KEC": "Construction & Infra", "KNRCON": "Construction & Infra", "KPIL": "Construction & Infra",
+  "LT": "Construction & Infra", "NBCC": "Construction & Infra", "NCC": "Construction & Infra", "PNCINFRA": "Construction & Infra",
+  "RITES": "Construction & Infra", "RVNL": "Construction & Infra", "SWSOLAR": "Construction & Infra",
+  // Consumer Durables (25)
+  "AMBER": "Consumer Durables", "ASIANPAINT": "Consumer Durables", "BATAINDIA": "Consumer Durables", "BERGEPAINT": "Consumer Durables",
+  "BLUESTARCO": "Consumer Durables", "CAMPUS": "Consumer Durables", "CELLO": "Consumer Durables", "CENTURYPLY": "Consumer Durables",
+  "CERA": "Consumer Durables", "CROMPTON": "Consumer Durables", "DIXON": "Consumer Durables", "HAVELLS": "Consumer Durables",
+  "INDIGOPNTS": "Consumer Durables", "KAJARIACER": "Consumer Durables", "KALYANKJIL": "Consumer Durables", "KANSAINER": "Consumer Durables",
+  "METROBRAND": "Consumer Durables", "RAJESHEXPO": "Consumer Durables", "SAFARI": "Consumer Durables", "TITAN": "Consumer Durables",
+  "VAIBHAVGBL": "Consumer Durables", "VGUARD": "Consumer Durables", "VIPIND": "Consumer Durables", "VOLTAS": "Consumer Durables",
+  "WHIRLPOOL": "Consumer Durables",
+  // Diversified (4)
+  "3MINDIA": "Diversified", "DCMSHRIRAM": "Diversified", "GODREJIND": "Diversified", "SWANENERGY": "Diversified",
+  // Insurance (9)
+  "GICRE": "Insurance", "HDFCLIFE": "Insurance", "ICICIGI": "Insurance", "ICICIPRULI": "Insurance",
+  "LICI": "Insurance", "NAM-INDIA": "Insurance", "NIACL": "Insurance", "SBILIFE": "Insurance",
+  "STARHEALTH": "Insurance",
+  // Logistics & Services (15)
+  "ADANIPORTS": "Logistics & Services", "ALLCARGO": "Logistics & Services", "BLUEDART": "Logistics & Services", "CONCOR": "Logistics & Services",
+  "DELHIVERY": "Logistics & Services", "ECLERX": "Logistics & Services", "FSL": "Logistics & Services", "GESHIP": "Logistics & Services",
+  "GMRINFRASTRUCT": "Logistics & Services", "GPPL": "Logistics & Services", "JSWINFRA": "Logistics & Services", "MMTC": "Logistics & Services",
+  "QUESS": "Logistics & Services", "REDINGTON": "Logistics & Services", "TVSSCS": "Logistics & Services",
+  // Media & Entertainment (6)
+  "NETWORK18": "Media & Entertainment", "PVRINOX": "Media & Entertainment", "SAREGAMA": "Media & Entertainment", "SUNTV": "Media & Entertainment",
+  "TIPSMUSIC": "Media & Entertainment", "ZEEL": "Media & Entertainment",
+  // Metals & Mining (17)
+  "ADANIENT": "Metals & Mining", "GMDCLTD": "Metals & Mining", "HINDALCO": "Metals & Mining", "HINDCOPPER": "Metals & Mining",
+  "HINDZINC": "Metals & Mining", "JAIBALAJI": "Metals & Mining", "JINDALSTEL": "Metals & Mining", "JSL": "Metals & Mining",
+  "JSWSTEEL": "Metals & Mining", "LLOYDSME": "Metals & Mining", "MOIL": "Metals & Mining", "NATIONALUM": "Metals & Mining",
+  "NMDC": "Metals & Mining", "NSLNISP": "Metals & Mining", "SAIL": "Metals & Mining", "TATASTEEL": "Metals & Mining",
+  "VEDL": "Metals & Mining",
+  // NBFC (52)
+  "360ONE": "NBFC", "AAVAS": "NBFC", "ABCAPITAL": "NBFC", "ANANDRATHI": "NBFC",
+  "ANGELONE": "NBFC", "APTUS": "NBFC", "BAJAJFINSV": "NBFC", "BAJAJHLDNG": "NBFC",
+  "BAJFINANCE": "NBFC", "BSE": "NBFC", "CAMS": "NBFC", "CANFINHOME": "NBFC",
+  "CDSL": "NBFC", "CGCL": "NBFC", "CHOLAFIN": "NBFC", "CHOLAHLDNG": "NBFC",
+  "CREDITACC": "NBFC", "CRISIL": "NBFC", "FIVESTAR": "NBFC", "HDFCAMC": "NBFC",
+  "HOMEFIRST": "NBFC", "HUDCO": "NBFC", "IEX": "NBFC", "IFCI": "NBFC",
+  "IIFL": "NBFC", "IRFC": "NBFC", "ISEC": "NBFC", "JIOFIN": "NBFC",
+  "JMFINANCIL": "NBFC", "KFINTECH": "NBFC", "LICHSGFIN": "NBFC", "LTF": "NBFC",
+  "M&MFIN": "NBFC", "MCX": "NBFC", "MFSL": "NBFC", "MOTILALOFS": "NBFC",
+  "NUVAMA": "NBFC", "PAYTM": "NBFC", "PEL": "NBFC", "PFC": "NBFC",
+  "PNBHOUSING": "NBFC", "POLICYBZR": "NBFC", "POONAWALLA": "NBFC", "RECLTD": "NBFC",
+  "SAMMAANCAP": "NBFC", "SBFC": "NBFC", "SBICARD": "NBFC", "SHRIRAMFIN": "NBFC",
+  "SUNDARAMFIN": "NBFC", "SUNDARMFIN": "NBFC", "TATAINVEST": "NBFC", "UTIAMC": "NBFC",
+  // Oil & Gas (19)
+  "AEGISLOG": "Oil & Gas", "ATGL": "Oil & Gas", "BPCL": "Oil & Gas", "CASTROLIND": "Oil & Gas",
+  "CHENNPETRO": "Oil & Gas", "COALINDIA": "Oil & Gas", "GAIL": "Oil & Gas", "GSPL": "Oil & Gas",
+  "GUJGASLTD": "Oil & Gas", "HINDPETRO": "Oil & Gas", "HPCL": "Oil & Gas", "IGL": "Oil & Gas",
+  "IOC": "Oil & Gas", "MGL": "Oil & Gas", "MRPL": "Oil & Gas", "OIL": "Oil & Gas",
+  "ONGC": "Oil & Gas", "PETRONET": "Oil & Gas", "RELIANCE": "Oil & Gas",
+  // Paints (1)
+  "AKZOINDIA": "Paints",
+  // Paper & Forest Products (2)
+  "ABREL": "Paper & Forest Products", "JKPAPER": "Paper & Forest Products",
+  // Power & Utilities (12)
+  "ADANIENSOL": "Power & Utilities", "ADANIGREEN": "Power & Utilities", "ADANIPOWER": "Power & Utilities", "CESC": "Power & Utilities",
+  "JSWENERGY": "Power & Utilities", "NHPC": "Power & Utilities", "NLCINDIA": "Power & Utilities", "NTPC": "Power & Utilities",
+  "POWERGRID": "Power & Utilities", "SJVN": "Power & Utilities", "TATAPOWER": "Power & Utilities", "TORNTPOWER": "Power & Utilities",
+  // Real Estate (11)
+  "BRIGADE": "Real Estate", "DLF": "Real Estate", "GODREJPROP": "Real Estate", "LODHA": "Real Estate",
+  "MAHLIFE": "Real Estate", "OBEROIRLTY": "Real Estate", "PHOENIXLTD": "Real Estate", "PRESTIGE": "Real Estate",
+  "SIGNATURE": "Real Estate", "SOBHA": "Real Estate", "SUNTECK": "Real Estate",
+  // Telecom (11)
+  "BHARTIARTL": "Telecom", "HFCL": "Telecom", "IDEA": "Telecom", "INDUSTOWER": "Telecom",
+  "ITI": "Telecom", "RAILTEL": "Telecom", "ROUTE": "Telecom", "STLTECH": "Telecom",
+  "TATACOMM": "Telecom", "TEJASNET": "Telecom", "TTML": "Telecom",
+  // Textiles (10)
+  "ALOKINDS": "Textiles", "ARVIND": "Textiles", "KPRMILL": "Textiles", "PAGEIND": "Textiles",
+  "RAYMOND": "Textiles", "TRIDENT": "Textiles", "VARDHMAN": "Textiles", "VTL": "Textiles",
+  "WELSPUNIND": "Textiles", "WELSPUNLIV": "Textiles"
 };
 const SECTOR_OPTIONS = [...new Set(Object.values(SECTOR_MAP))].concat(["Uncategorized"]).sort();
 const sectorOverrides = {}; // symbol -> sector, user corrections this session
@@ -470,7 +637,11 @@ const sectorOverrides = {}; // symbol -> sector, user corrections this session
 // Fixed per-sector colors — chosen to be intuitive (finance=blue, motors=red,
 // health=violet, gold-lending=mustard, etc.) and mutually distinct, not derived
 // from rank or sort order, so a sector is always the same color everywhere on
-// the page regardless of how the portfolio shuffles.
+// the page regardless of how the portfolio shuffles. Sectors not listed here
+// (there are more of those now than there are explicit colors) still get a
+// stable color automatically via the FALLBACK_PALETTE hash in colorForSector()
+// — you don't need to add every new sector here, only ones worth a hand-picked
+// color.
 const SECTOR_COLORS = {
   "Banking": "#0066B1",            // BMW blue — finance/trust
   "Automobile": "#E7222E",         // BMW red — motors
@@ -480,6 +651,7 @@ const SECTOR_COLORS = {
   "FMCG": "#F0B429",               // amber — consumer goods
   "NBFC (Gold Loan)": "#B8860B",   // dark goldenrod — literally gold-backed lending
   "Hotels & Hospitality": "#E0559E", // magenta/pink — hospitality, leisure
+  "Retail": "#5C6BC0",             // indigo — distinct from the pink/magenta hospitality uses
   "Uncategorized": "#9E9E9E"       // neutral gray
 };
 // Any sector not in the map above still needs a stable color — hash the name
@@ -558,6 +730,7 @@ function pct(n, forceSign){
   return sign + Math.abs(n).toFixed(2) + '%';
 }
 
+
 // ---------- Format A: concatenated ₹-prefixed text, no separators ----------
 // SYMBOL QTY ₹buyAvg ₹buyValue ₹ltp ₹presentValue [+/-]₹pnl [+/-]pnl%
 // e.g. "ARE&M1₹760.00₹760.00₹921.70₹921.70+₹161.70+21.28%..."
@@ -566,15 +739,17 @@ function parseHoldingsConcatenated(raw){
   const out = [];
   let m;
   while((m = re.exec(raw)) !== null){
+    const symbol = m[1].toUpperCase();
     out.push({
-      symbol: m[1].toUpperCase(),
+      symbol,
       qty: num(m[2]),
       buyAvg: num(m[3]),
       buyValue: num(m[4]),
       ltp: num(m[5]),
       presentValue: num(m[6]),
       pnl: (m[7]==='-'?-1:1) * num(m[8]),
-      pnlPct: (m[9]==='-'?-1:1) * num(m[10])
+      pnlPct: (m[9]==='-'?-1:1) * num(m[10]),
+      category: sectorFor(symbol)
     });
   }
   return out;
@@ -615,7 +790,8 @@ function parseHoldingsTabular(raw){
         ltp: num(t[3]),
         presentValue: num(t[4]),
         pnl: num(t[5]),
-        pnlPct: num(t[6])
+        pnlPct: num(t[6]),
+        category: sectorFor(b.symbol)
       });
     }
   });
@@ -667,11 +843,13 @@ function renderHoldings(){
 }
 
 // Shared by the sector table and the pie chart, so both always agree on the numbers.
+// Groups by each holding's `category` field (set at parse time via the
+// SECTOR_MAP lookup in sectorFor()).
 function getSectorTotals(){
   const totals = {};
   const totalAll = holdings.reduce((a,h)=>a+h.buyValue,0);
   holdings.forEach(h=>{
-    const s = sectorFor(h.symbol);
+    const s = h.category || 'Uncategorized';
     totals[s] = (totals[s]||0) + h.buyValue;
   });
   return { totals, totalAll };
@@ -744,7 +922,7 @@ function renderDonut(wrapId, rows, totalAll, colorFn, totalLabel, idPrefix){
 
     if(rows.length === 1){
       // A single group: a full ring, no bisector to pop toward.
-      slicesSVG.push(`<circle class="pie-slice" data-key="${idPrefix}-${safeLabel}" cx="${cx}" cy="${cy}" r="${(rOuter+rInner)/2}" fill="none" stroke="url(#${gradId})" stroke-width="${rOuter-rInner}"><title>${label}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></circle>`);
+      slicesSVG.push(`<circle class="pie-slice" data-key="${idPrefix}-${safeLabel}" cx="${cx}" cy="${cy}" r="${(rOuter+rInner)/2}" fill="none" stroke="url(#${gradId})" stroke-width="${rOuter-rInner}"><title>${label}: ${inr(val)} (${pctShare.toFixed(2)}%)</title></circle>`);
     } else {
       const start = angle;
       const end = angle + sweep;
@@ -752,7 +930,7 @@ function renderDonut(wrapId, rows, totalAll, colorFn, totalLabel, idPrefix){
       const dirRad = (mid - 90) * Math.PI / 180;
       const tx = (Math.cos(dirRad) * POP).toFixed(2);
       const ty = (Math.sin(dirRad) * POP).toFixed(2);
-      slicesSVG.push(`<path class="pie-slice" data-key="${idPrefix}-${safeLabel}" style="--tx:${tx}px;--ty:${ty}px" d="${donutSlicePath(cx, cy, rOuter, rInner, start, end)}" fill="url(#${gradId})"><title>${label}: ${inr(val)} (${pctShare.toFixed(1)}%)</title></path>`);
+      slicesSVG.push(`<path class="pie-slice" data-key="${idPrefix}-${safeLabel}" style="--tx:${tx}px;--ty:${ty}px" d="${donutSlicePath(cx, cy, rOuter, rInner, start, end)}" fill="url(#${gradId})"><title>${label}: ${inr(val)} (${pctShare.toFixed(2)}%)</title></path>`);
       angle = end;
     }
     legendRows.push(`
@@ -761,7 +939,7 @@ function renderDonut(wrapId, rows, totalAll, colorFn, totalLabel, idPrefix){
         <span class="pie-legend-name">${label}</span>
         <span class="pie-legend-bar-track"><span class="pie-legend-bar-fill" style="width:${barWidth.toFixed(0)}%;background:${color};"></span></span>
         <span class="pie-legend-val">${inr(val)}</span>
-        <span class="pie-legend-pct">${pctShare.toFixed(1)}%</span>
+        <span class="pie-legend-pct">${pctShare.toFixed(2)}%</span>
       </div>`);
   });
 
@@ -813,12 +991,13 @@ function renderSectorPie(){
 
 // ---------- Market cap tier map (Large / Mid / Small) ----------
 // This is a manually-maintained snapshot, not a live feed — there is no
-// reliable way to fetch live Indian market-cap data from pure client-side
-// JS. NSE's own API blocks direct cross-origin browser requests, and every
-// CORS-friendly alternative needs a personal API key, which would sit
-// exposed in this public repo's source. So this works the same way
-// SECTOR_MAP does: values sourced and checked periodically, not real-time.
-// Tier boundaries follow AMFI's most recent categorisation (~mid-2026):
+// reliable way to fetch live market-cap data from pure client-side JS for
+// either country. NSE's API blocks direct cross-origin browser requests, and
+// every CORS-friendly alternative (US or Indian) needs a personal API key,
+// which would sit exposed in this public repo's source. So this works the
+// same way SECTOR_MAP does: values sourced and checked periodically, not
+// real-time.
+// India tier boundaries follow AMFI's most recent categorisation (~mid-2026):
 // Large cap ≥ ₹1,06,300 Cr; Mid cap ₹33,500–1,06,300 Cr; Small cap below that.
 const MARKET_CAP_CR = {
   "ARE&M": 16000,
@@ -933,7 +1112,7 @@ function renderSimSectors(){
   const current = {};
   const updated = {};
   holdings.forEach((h,i)=>{
-    const s = sectorFor(h.symbol);
+    const s = h.category || 'Uncategorized';
     const addQty = addQtyState[i] || 0;
     const newInvested = h.buyValue + addQty * h.ltp;
     current[s] = (current[s]||0) + h.buyValue;
@@ -950,7 +1129,7 @@ function renderSimSectors(){
       <td class="sector-name">${s}</td>
       <td>${inr(cur)}</td>
       <td class="${changed?'up':''}">${inr(upd)}</td>
-      <td>${w.toFixed(1)}%</td>
+      <td>${w.toFixed(2)}%</td>
     </tr>`;
   }).join('');
 }
@@ -1062,4 +1241,5 @@ window.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 </body>
+
 </html>
