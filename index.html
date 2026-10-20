@@ -108,6 +108,31 @@
   .theme-toggle button:hover{transform:scale(1.08);}
   .theme-toggle button:active{transform:scale(0.94);}
 
+  /* ---------- Country tabs ---------- */
+  /* Sits directly on top of the "Paste Holdings Data" panel, like a real tab
+     strip (flat, underline-indicated active tab) rather than a floating pill
+     toggle — visually says "these two are different workspaces" more clearly
+     than a toggle switch would. */
+  .country-tabs{
+    display:flex;gap:2px;padding:0 10px;
+  }
+  .country-tab{
+    all:unset;cursor:pointer;
+    padding:10px 18px 11px;
+    font-family:var(--font-system);font-size:13px;font-weight:600;
+    color:var(--ink-dim);
+    border-radius:12px 12px 0 0;
+    border-bottom:3px solid transparent;
+    transition:color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  }
+  .country-tab:hover{ color:var(--ink); background:rgba(0,0,0,0.03); }
+  [data-theme="dark"] .country-tab:hover{ background:rgba(255,255,255,0.05); }
+  .country-tab.active{
+    color:var(--accent);
+    background:var(--glass-bg-strong);
+    border-bottom-color:var(--accent);
+  }
+
   /* ---------- Glass panel ---------- */
   .panel{
     background:var(--glass-bg);
@@ -346,6 +371,22 @@
   </div>
 
   <div class="panel">
+    <div class="panel-head"><h2>Overall Portfolio</h2><span class="tag">combined, in ₹</span></div>
+    <div class="panel-body" style="overflow-x:auto;">
+      <table id="overviewTable">
+        <thead><tr><th>Market</th><th>Invested</th><th>Present Value</th><th>P&amp;L</th><th>P&amp;L %</th></tr></thead>
+        <tbody><tr><td colspan="5" class="empty">Build a portfolio in the India or US tab below — each one you build gets added here automatically.</td></tr></tbody>
+        <tfoot></tfoot>
+      </table>
+      <div class="hint" id="overviewHint"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="country-tabs" role="tablist" aria-label="Country">
+      <button type="button" class="country-tab" id="countryIN" data-country="IN" role="tab">🇮🇳 India (₹)</button>
+      <button type="button" class="country-tab" id="countryUS" data-country="US" role="tab">🇺🇸 US ($)</button>
+    </div>
     <div class="panel-head"><h2>Paste Holdings Data</h2><span class="tag">input</span></div>
     <div class="panel-body">
       <textarea id="rawInput" placeholder="Paste your holdings snapshot here — either the ₹-concatenated text or the tab-separated table copied straight from your broker's holdings screen. Both formats are auto-detected."></textarea>
@@ -355,7 +396,7 @@
         <button class="ghost" id="shareBtn">Copy link to view on phone</button>
       </div>
       <div class="hint" id="parseMsg"></div>
-      <div class="hint">Your last pasted data is saved on this device automatically. Use "Copy link" to open the same tables on your phone or any other device — the data travels inside the link itself, nothing is uploaded anywhere.</div>
+      <div class="hint">Your last pasted data is saved on this device automatically, separately for each tab. Use "Copy link" to open the same tables on your phone or any other device — the data travels inside the link itself, nothing is uploaded anywhere.</div>
     </div>
   </div>
 
@@ -365,7 +406,7 @@
       <table id="holdingsTable">
         <thead><tr>
           <th>Symbol</th><th>Qty</th><th>Buy Avg</th><th>Buy Value</th>
-          <th>LTP</th><th>Present Value</th><th>P&amp;L</th><th>P&amp;L %</th>
+          <th id="ltpHeader">LTP</th><th>Present Value</th><th>P&amp;L</th><th>P&amp;L %</th>
         </tr></thead>
         <tbody><tr><td colspan="8" class="empty">No data yet — paste your holdings above.</td></tr></tbody>
         <tfoot></tfoot>
@@ -374,7 +415,7 @@
   </div>
 
   <div class="panel">
-    <div class="panel-head"><h2>2 · Sector Allocation</h2><span class="tag">by invested value</span></div>
+    <div class="panel-head"><h2 id="sectorHeading">2 · Sector Allocation</h2><span class="tag">by invested value</span></div>
     <div class="panel-body" style="overflow-x:auto;">
       <div class="pie-wrap" id="pieWrap">
         <div class="empty">Sector breakdown appears here after parsing.</div>
@@ -388,7 +429,7 @@
       <div class="pie-wrap" id="capWrap">
         <div class="empty">Market cap breakdown appears here after parsing.</div>
       </div>
-      <div class="hint">Tiers follow AMFI's latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding's approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.</div>
+      <div class="hint" id="capHint">Tiers follow AMFI's latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding's approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.</div>
     </div>
   </div>
 
@@ -652,7 +693,12 @@ const SECTOR_COLORS = {
   "NBFC (Gold Loan)": "#B8860B",   // dark goldenrod — literally gold-backed lending
   "Hotels & Hospitality": "#E0559E", // magenta/pink — hospitality, leisure
   "Retail": "#5C6BC0",             // indigo — distinct from the pink/magenta hospitality uses
-  "Uncategorized": "#9E9E9E"       // neutral gray
+  "Uncategorized": "#9E9E9E",      // neutral gray
+  // US "Category" column values reuse the same visual language where the
+  // concept overlaps (Tech ~ IT Services, Bank ~ Banking), so a US tab reads
+  // consistently with the India tab's color scheme.
+  "Tech": "#009688",
+  "Bank": "#0066B1"
 };
 // Any sector not in the map above still needs a stable color — hash the name
 // to a deterministic index into this fallback palette so it's consistent
@@ -664,6 +710,18 @@ function colorForSector(name){
   for(let i=0;i<name.length;i++){ hash = (hash*31 + name.charCodeAt(i)) >>> 0; }
   return FALLBACK_PALETTE[hash % FALLBACK_PALETTE.length];
 }
+
+// ---------- Country / currency handling ----------
+// The whole page works for either an Indian (₹) or a US ($) holdings tab.
+// CURRENT_COUNTRY controls: which parser runs, the currency symbol + number
+// locale used everywhere via inr(), a few header/heading labels, which sample
+// data loads, and which market-cap tier thresholds apply. It's set explicitly
+// by the country tabs (not auto-detected) since the person knows which
+// portfolio they're pasting — auto-detection would guess wrong on ambiguous
+// data (e.g. a plain-number US export with no $ signs).
+let CURRENT_COUNTRY = 'IN';
+const COUNTRY_CURRENCY = { IN: '₹', US: '$' };
+const COUNTRY_LOCALE = { IN: 'en-IN', US: 'en-US' };
 
 const SAMPLE = `ARE&M
   3
@@ -717,13 +775,27 @@ TMPV
 ZYDUSLIFE
 5\t926.97\t4,634.85\t1,097.10\t5,485.50\t850.65\t+18.35%`;
 
+// Bundled US sample — exactly the format a US brokerage export tends to use:
+// a header row, tab-separated, $-prefixed prices, fractional share counts.
+const SAMPLE_US = `Ticker\tDescription\tAverage/share\tCurrent Price\tNo of Shares\tInvested Value\tCurrent Value\tCategory
+AMZN\tAmazon.com Inc\t$263.38\t$256.78\t1.701\t$448.020\t$436.80\tTech
+BAC\tBank of America Corporation\t$58.45\t$62.69\t0.894\t$52.250\t$56.04\tBank
+MSFT\tMicrosoft Corp\t$385.69\t$495.63\t0.134\t$51.760\t$66.51\tTech
+TM\tToyota Motor Corp\t$198.00\t$198.20\t0.497\t$98.410\t$98.51\tAutomobile
+GOOGL\tAlphabet Inc Class A\t$345.64\t$344.18\t0.448\t$154.860\t$154.21\tTech`;
+
 let holdings = [];
 let addQtyState = []; // parallel array to `holdings`: extra qty the user is considering buying, per row
 
-function num(s){ return parseFloat(String(s).replace(/,/g,'')); }
+function num(s){ return parseFloat(String(s).replace(/,/g,'').replace(/\$/g,'')); }
+// Named `inr` for historical reasons (this tool started India-only), but it's
+// now the single money-formatting function for both currencies — it reads
+// CURRENT_COUNTRY at call time rather than being hardcoded to ₹.
 function inr(n, forceSign){
   const sign = n < 0 ? '-' : (forceSign ? '+' : '');
-  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const symbol = COUNTRY_CURRENCY[CURRENT_COUNTRY] || '₹';
+  const locale = COUNTRY_LOCALE[CURRENT_COUNTRY] || 'en-IN';
+  return sign + symbol + Math.abs(n).toLocaleString(locale, {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function pct(n, forceSign){
   const sign = n < 0 ? '-' : (forceSign ? '+' : '');
@@ -798,12 +870,58 @@ function parseHoldingsTabular(raw){
   return out;
 }
 
-// Auto-detect which format was pasted and parse accordingly.
-function parseHoldings(raw){
+// ---------- Format C: US brokerage export ----------
+// Header row + tab-separated columns:
+//   Ticker  Description  Average/share  Current Price  No of Shares  Invested Value  Current Value  Category
+// Prices/values are $-prefixed, share counts are commonly fractional. Unlike
+// the India formats, Invested Value and Current Value are given directly
+// rather than needing to be computed — and P&L isn't given at all, so it's
+// derived here. Category also comes straight from the data (no SECTOR_MAP
+// lookup needed, since the export already classifies each holding).
+function parseHoldingsUS(raw){
+  const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const out = [];
+  lines.forEach(line=>{
+    if(!line.includes('\t')) return; // skip the header row and any stray blank/lone lines
+    const cols = line.split('\t').map(c=>c.trim());
+    if(cols.length < 8) return;
+    const [ticker, description, avgPerShare, currentPrice, sharesStr, investedStr, currentStr, category] = cols;
+    if(/^ticker$/i.test(ticker)) return; // header row itself, in case it wasn't filtered above
+    const buyAvg = num(avgPerShare);
+    const ltp = num(currentPrice);
+    const qty = parseFloat(sharesStr);
+    const buyValue = num(investedStr);
+    const presentValue = num(currentStr);
+    const pnl = presentValue - buyValue;
+    const pnlPct = buyValue ? (pnl / buyValue * 100) : 0;
+    out.push({
+      symbol: ticker.toUpperCase(),
+      description,
+      qty, buyAvg, buyValue, ltp, presentValue, pnl, pnlPct,
+      category: category || 'Uncategorized'
+    });
+  });
+  return out;
+}
+
+// Country-explicit version, used when parsing data that isn't necessarily
+// for the currently active tab (e.g. the Overall Portfolio panel, which
+// needs to parse both countries' saved snapshots regardless of which one
+// is currently selected in the UI).
+function parseForCountry(raw, country){
+  if(country === 'US'){
+    return parseHoldingsUS(raw);
+  }
   if(raw.indexOf('₹') !== -1){
     return parseHoldingsConcatenated(raw);
   }
   return parseHoldingsTabular(raw);
+}
+
+// Format is decided by the explicit country tab, not auto-detected — see
+// the note above CURRENT_COUNTRY for why guessing from content is unreliable.
+function parseHoldings(raw){
+  return parseForCountry(raw, CURRENT_COUNTRY);
 }
 
 function sectorFor(symbol){
@@ -1022,6 +1140,16 @@ const MARKET_CAP_CR = {
   // it has no market cap of its own, so it's deliberately left out and
   // tierForSymbol() routes it to an "ETF / Fund" bucket instead.
 };
+// US tier boundaries follow the standard convention used by most US index
+// providers: Large cap ≥ $10B; Mid cap $2B–$10B; Small cap below $2B.
+// Values are approximate market cap in $ billions.
+const MARKET_CAP_USD_B = {
+  "AMZN": 2400,
+  "BAC": 330,
+  "MSFT": 3700,
+  "TM": 260,
+  "GOOGL": 2300
+};
 const CAP_TIER_ORDER = ["Large Cap", "Mid Cap", "Small Cap", "ETF / Fund"];
 const CAP_TIER_COLORS = {
   "Large Cap": "#0066B1",   // BMW blue — same "steady/blue-chip" association as Banking
@@ -1030,6 +1158,13 @@ const CAP_TIER_COLORS = {
   "ETF / Fund": "#9E9E9E"   // neutral gray — not a single-company risk tier
 };
 function tierForSymbol(symbol){
+  if(CURRENT_COUNTRY === 'US'){
+    if(!(symbol in MARKET_CAP_USD_B)) return "ETF / Fund";
+    const b = MARKET_CAP_USD_B[symbol];
+    if(b >= 10) return "Large Cap";
+    if(b >= 2) return "Mid Cap";
+    return "Small Cap";
+  }
   if(!(symbol in MARKET_CAP_CR)) return "ETF / Fund";
   const cr = MARKET_CAP_CR[symbol];
   if(cr >= 106300) return "Large Cap";
@@ -1157,21 +1292,67 @@ function showSkeletons(){
 
 const parseBtn = document.getElementById('parseBtn');
 
-// ---------- Persistence: last pasted data + shareable cross-device link ----------
-const STORAGE_KEY = 'ledger-last-raw';
-
-function saveLastData(raw){
-  try{ localStorage.setItem(STORAGE_KEY, raw); }catch(e){}
+// ---------- Country tab wiring ----------
+// Updates the currency-dependent labels that can't just re-read inr() live —
+// static header/heading text needs an explicit rewrite when the tab flips.
+function applyCountry(country){
+  CURRENT_COUNTRY = country;
+  document.getElementById('countryIN').classList.toggle('active', country === 'IN');
+  document.getElementById('countryUS').classList.toggle('active', country === 'US');
+  document.getElementById('ltpHeader').textContent = country === 'US' ? 'Price' : 'LTP';
+  document.getElementById('sectorHeading').textContent = country === 'US' ? '2 · Category Allocation' : '2 · Sector Allocation';
+  document.getElementById('capHint').textContent = country === 'US'
+    ? 'Tiers follow the standard US convention (Large Cap ≥ $10B, Mid Cap ≥ $2B, else Small Cap), applied to each holding\'s approximate market cap.'
+    : 'Tiers follow AMFI\'s latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding\'s approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.';
+  document.getElementById('rawInput').placeholder = country === 'US'
+    ? 'Paste your US holdings export here — header row + tab-separated columns: Ticker, Description, Average/share, Current Price, No of Shares, Invested Value, Current Value, Category.'
+    : 'Paste your holdings snapshot here — either the ₹-concatenated text or the tab-separated table copied straight from your broker\'s holdings screen. Both formats are auto-detected.';
 }
-function loadLastData(){
-  try{ return localStorage.getItem(STORAGE_KEY); }catch(e){ return null; }
+document.getElementById('countryIN').addEventListener('click', ()=>{
+  applyCountry('IN');
+  const fromStorage = loadLastData('IN');
+  document.getElementById('rawInput').value = fromStorage ? fromStorage.raw : SAMPLE;
+  parseBtn.click();
+});
+document.getElementById('countryUS').addEventListener('click', ()=>{
+  applyCountry('US');
+  const fromStorage = loadLastData('US');
+  document.getElementById('rawInput').value = fromStorage ? fromStorage.raw : SAMPLE_US;
+  parseBtn.click();
+});
+
+// ---------- Persistence: last pasted data (per country) + shareable link ----------
+// Each country's raw snapshot is stored under its own key so switching tabs
+// and building the other country's tables never overwrites/loses the first
+// one — this is what lets the Overall Portfolio panel show both at once.
+// `ledger-last-country` separately remembers which tab was active last,
+// purely for which one to reopen; it doesn't gate what Overview can see.
+function storageKeyFor(country){ return 'ledger-data-' + country; }
+
+function saveLastData(raw, country){
+  try{
+    localStorage.setItem(storageKeyFor(country), JSON.stringify({ raw }));
+    localStorage.setItem('ledger-last-country', country);
+  }catch(e){}
+}
+function loadLastData(country){
+  try{
+    const stored = localStorage.getItem(storageKeyFor(country));
+    if(!stored) return null;
+    const parsed = JSON.parse(stored);
+    if(parsed && typeof parsed.raw === 'string') return { raw: parsed.raw, country };
+  }catch(e){}
+  return null;
+}
+function loadLastActiveCountry(){
+  try{ return localStorage.getItem('ledger-last-country') || 'IN'; }catch(e){ return 'IN'; }
 }
 // btoa/atob only handle Latin1, so the ₹ symbol and similar need this escape hop.
-function encodeForLink(raw){
-  return btoa(unescape(encodeURIComponent(raw)));
+function encodeForLink(obj){
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
 }
 function decodeFromLink(encoded){
-  return decodeURIComponent(escape(atob(encoded)));
+  return JSON.parse(decodeURIComponent(escape(atob(encoded))));
 }
 function getDataFromUrl(){
   const hash = window.location.hash;
@@ -1180,6 +1361,83 @@ function getDataFromUrl(){
     catch(e){ return null; }
   }
   return null;
+}
+
+// ---------- Overall Portfolio: combines both countries' saved snapshots ----------
+// Not a live FX rate — same constraint as MARKET_CAP_CR/MARKET_CAP_USD_B (no
+// CORS-friendly free FX API a static page can call without exposing a key).
+// Update this periodically by searching the current USD/INR rate; it drifts
+// enough over months to matter for a combined total, even if day-to-day noise
+// doesn't.
+const FX_RATE_USD_TO_INR = 95.5;
+
+// Reads a country's last-saved snapshot (independent of which tab is
+// currently active) and returns its totals, or null if that country has
+// never been built. Uses parseForCountry (not the CURRENT_COUNTRY-reading
+// parseHoldings) specifically so this doesn't depend on/disturb whatever the
+// person currently has open in the paste box.
+function computeCountryTotals(country){
+  const stored = loadLastData(country);
+  if(!stored) return null;
+  let rows;
+  try{ rows = parseForCountry(stored.raw, country); }catch(e){ return null; }
+  if(!rows.length) return null;
+  const invested = rows.reduce((a,h)=>a+h.buyValue,0);
+  const present = rows.reduce((a,h)=>a+h.presentValue,0);
+  return { invested, present, pnl: present - invested, pnlPct: invested ? (present-invested)/invested*100 : 0 };
+}
+
+// Always renders in ₹ regardless of the currently active tab — this is a
+// combined view, so it can't follow CURRENT_COUNTRY the way inr() does. A
+// tiny local formatter keeps that independent of the global setting.
+function fmtOverviewINR(n, forceSign){
+  const sign = n < 0 ? '-' : (forceSign ? '+' : '');
+  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function renderOverview(){
+  const tbody = document.querySelector('#overviewTable tbody');
+  const tfoot = document.querySelector('#overviewTable tfoot');
+  const hint = document.getElementById('overviewHint');
+  const inTotals = computeCountryTotals('IN');
+  const usTotals = computeCountryTotals('US');
+
+  if(!inTotals && !usTotals){
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Build a portfolio in the India or US tab below — each one you build gets added here automatically.</td></tr>';
+    tfoot.innerHTML = '';
+    hint.textContent = '';
+    return;
+  }
+
+  const rows = [];
+  if(inTotals) rows.push(['India (₹)', inTotals.invested, inTotals.present, inTotals.pnl, inTotals.pnlPct]);
+  if(usTotals) rows.push(['US ($ → ₹)', usTotals.invested*FX_RATE_USD_TO_INR, usTotals.present*FX_RATE_USD_TO_INR, usTotals.pnl*FX_RATE_USD_TO_INR, usTotals.pnlPct]);
+
+  tbody.innerHTML = rows.map(([label, inv, pres, pnl, pnlPct])=>`
+    <tr class="fade-in">
+      <td>${label}</td>
+      <td>${fmtOverviewINR(inv)}</td>
+      <td>${fmtOverviewINR(pres)}</td>
+      <td class="${pnl>=0?'up':'down'}">${fmtOverviewINR(pnl, true)}</td>
+      <td class="${pnlPct>=0?'up':'down'}">${pct(pnlPct, true)}</td>
+    </tr>`).join('');
+
+  const totInv = rows.reduce((a,r)=>a+r[1],0);
+  const totPres = rows.reduce((a,r)=>a+r[2],0);
+  const totPnl = totPres - totInv;
+  const totPnlPct = totInv ? (totPnl/totInv*100) : 0;
+  tfoot.innerHTML = `<tr>
+    <td>Combined</td>
+    <td>${fmtOverviewINR(totInv)}</td>
+    <td>${fmtOverviewINR(totPres)}</td>
+    <td class="${totPnl>=0?'up':'down'}">${fmtOverviewINR(totPnl, true)}</td>
+    <td class="${totPnlPct>=0?'up':'down'}">${pct(totPnlPct, true)}</td>
+  </tr>`;
+
+  hint.textContent = (inTotals && usTotals)
+    ? `US amounts converted at an approximate ₹${FX_RATE_USD_TO_INR}/$ rate (not live) — treat the combined total as directional, not exact.`
+    : (usTotals ? `Converted at an approximate ₹${FX_RATE_USD_TO_INR}/$ rate (not live). Build an India portfolio too to see it combined here.`
+               : 'Build a US portfolio too (tab above) to see it combined here.');
 }
 
 parseBtn.addEventListener('click', ()=>{
@@ -1199,27 +1457,30 @@ parseBtn.addEventListener('click', ()=>{
     parseBtn.classList.remove('loading');
     parseBtn.disabled = false;
     if(!parsed.length){
-      msg.textContent = "Couldn't find any rows in that format — check it matches Symbol/Qty/Buy Avg/Buy Value/LTP/Present Value/P&L/P&L% with no separators.";
+      msg.textContent = CURRENT_COUNTRY === 'US'
+        ? "Couldn't find any rows in that format — check it matches Ticker/Description/Average per share/Current Price/No of Shares/Invested Value/Current Value/Category, tab-separated with a header row."
+        : "Couldn't find any rows in that format — check it matches Symbol/Qty/Buy Avg/Buy Value/LTP/Present Value/P&L/P&L% with no separators.";
       renderAll();
       return;
     }
     holdings = parsed;
-    saveLastData(raw);
+    saveLastData(raw, CURRENT_COUNTRY);
     msg.textContent = `Parsed ${parsed.length} holdings. Saved on this device.`;
     document.getElementById('asof').textContent = new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
     renderAll();
+    renderOverview();
   }, 550);
 });
 
 document.getElementById('sampleBtn').addEventListener('click', ()=>{
-  document.getElementById('rawInput').value = SAMPLE;
+  document.getElementById('rawInput').value = CURRENT_COUNTRY === 'US' ? SAMPLE_US : SAMPLE;
 });
 
 document.getElementById('shareBtn').addEventListener('click', async ()=>{
   const raw = document.getElementById('rawInput').value.trim();
   const msg = document.getElementById('parseMsg');
   if(!raw){ msg.textContent = 'Paste and build your holdings first, then copy the link.'; return; }
-  const url = window.location.origin + window.location.pathname + '#data=' + encodeURIComponent(encodeForLink(raw));
+  const url = window.location.origin + window.location.pathname + '#data=' + encodeURIComponent(encodeForLink({ raw, country: CURRENT_COUNTRY }));
   try{
     await navigator.clipboard.writeText(url);
     msg.textContent = 'Link copied — open it on your phone to see the same tables.';
@@ -1231,13 +1492,24 @@ document.getElementById('shareBtn').addEventListener('click', async ()=>{
 });
 
 // Load order: a shared link's data takes priority (that's an explicit share),
-// then whatever was last built on this device, then the bundled sample.
+// then whatever this device last built *for the last-active tab*, then the
+// bundled sample. Country must be applied before parsing, since it
+// determines which parser and currency formatting the initial data needs.
 window.addEventListener('DOMContentLoaded', ()=>{
   const fromLink = getDataFromUrl();
-  const fromStorage = loadLastData();
-  const initial = fromLink || fromStorage || SAMPLE;
-  document.getElementById('rawInput').value = initial;
+  let initialRaw, initialCountry;
+  if(fromLink){
+    initialCountry = fromLink.country || 'IN';
+    initialRaw = fromLink.raw;
+  } else {
+    initialCountry = loadLastActiveCountry();
+    const fromStorage = loadLastData(initialCountry);
+    initialRaw = fromStorage ? fromStorage.raw : (initialCountry === 'US' ? SAMPLE_US : SAMPLE);
+  }
+  applyCountry(initialCountry);
+  document.getElementById('rawInput').value = initialRaw;
   parseBtn.click();
+  renderOverview();
 });
 </script>
 </body>
