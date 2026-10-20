@@ -837,12 +837,22 @@ function parseHoldingsConcatenated(raw){
 // regardless of how many extra lines/numbers precede the real row.
 function parseHoldingsTabular(raw){
   const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  const symbolRe = /^[A-Za-z&]+$/;
+  // Matches a bare symbol line ("HDFCBANK"), a symbol with the T1 sub-quantity
+  // inline on the same line ("ARE&M 3" — some broker exports put it here
+  // instead of on its own following line), or a symbol containing hyphens
+  // (rights-entitlement/renounced tickers like "NATCO-RE-R"). The trailing
+  // "\s+\d+" is intentionally NOT captured — it's the same stray T1 number
+  // the "last 7 tokens" logic below already discards, whether it shows up
+  // inline here or on its own following line (that old shape still works:
+  // a lone-digit line fails this regex, so it just falls through to the
+  // token-continuation branch below like any other stray number line).
+  const symbolRe = /^([A-Za-z&-]+)(?:\s+\d+)?$/;
   const blocks = [];
   let current = null;
   lines.forEach(line=>{
-    if(symbolRe.test(line)){
-      current = {symbol: line.toUpperCase(), tokens: []};
+    const m = line.match(symbolRe);
+    if(m){
+      current = {symbol: m[1].toUpperCase(), tokens: []};
       blocks.push(current);
     } else if(current){
       let parts = line.split(/\t+|\s{2,}/).map(s=>s.trim()).filter(Boolean);
