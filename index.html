@@ -146,7 +146,6 @@
       inset 0 -1px 1px rgba(255,255,255,0.06),
       var(--glass-shadow);
     margin-bottom:22px;
-    overflow:hidden;
     transition:background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
   }
   [data-theme="dark"] .panel{
@@ -156,13 +155,25 @@
       var(--glass-shadow);
   }
   .panel-head{
+    position:sticky;
+    top:0;
+    z-index:5;
     padding:14px 20px;
     border-bottom:2px solid transparent;
     border-image:linear-gradient(90deg, var(--accent) 0%, var(--accent) 60%, var(--red) 100%) 1;
     display:flex;justify-content:space-between;align-items:center;
-    background:rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.75);
+    backdrop-filter:blur(14px) saturate(160%);
+    -webkit-backdrop-filter:blur(14px) saturate(160%);
+    /* .panel itself no longer clips overflow (that would break this element's
+       stickiness — see SKILL.md), so this element clips its own background
+       to the panel's top corners instead. overflow:hidden here is safe: it's
+       on the sticky element itself, not an ancestor, so it has no effect on
+       whether *this* element can stick. */
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    overflow:hidden;
   }
-  [data-theme="dark"] .panel-head{ background:rgba(0,0,0,0.12); }
+  [data-theme="dark"] .panel-head{ background:rgba(20,18,26,0.8); }
   .panel-head h2{
     font-size:13px;text-transform:uppercase;letter-spacing:0.06em;
     margin:0;color:var(--ink);font-weight:700;
