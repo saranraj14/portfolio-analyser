@@ -1193,7 +1193,7 @@ function renderStockSummaryCards(){
 
   let cards = portfolioCard;
   if(holdings.length > 1){
-    cards += moverCard('Top Gainer', '🏆', best, 'up') + moverCard('Biggest Drag', '📉', worst, 'down', false);
+    cards += moverCard('Top Gainer', '🏆', best, 'up') + moverCard('Biggest Drag', '📉', worst, 'down');
   } else {
     // A single holding can't meaningfully have a separate "best" vs "worst" —
     // showing both would just be the same stock twice, which reads as a bug,
@@ -1659,14 +1659,14 @@ function showSkeletons(){
   if(CURRENT_COUNTRY === 'BONDS'){
     document.querySelector('#bondsTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(10)).join('');
     document.querySelector('#bondsTable tfoot').innerHTML = '';
-    document.getElementById('maturityTimeline').innerHTML = Array.from({length:3}).map(()=>'<div class="skeleton-bar" style="flex:1 1 220px;min-width:220px;height:140px;border-radius:22px;"></div>').join('');
+    document.getElementById('maturityTimeline').innerHTML = Array.from({length:3}).map(()=>'<div class="skeleton-bar" style="flex:1 1 220px;min-width:220px;height:140px;border-radius:26px;"></div>').join('');
     document.querySelector('#bondProjectionTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(6)).join('');
     document.querySelector('#bondProjectionTable tfoot').innerHTML = '';
     return;
   }
   document.querySelector('#holdingsTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(8)).join('');
   document.querySelector('#holdingsTable tfoot').innerHTML = '';
-  document.getElementById('stockSummaryCards').innerHTML = Array.from({length:3}).map(()=>'<div class="skeleton-bar" style="flex:1 1 220px;min-width:220px;height:140px;border-radius:22px;"></div>').join('');
+  document.getElementById('stockSummaryCards').innerHTML = Array.from({length:3}).map(()=>'<div class="skeleton-bar" style="flex:1 1 220px;min-width:220px;height:140px;border-radius:26px;"></div>').join('');
   document.getElementById('pieWrap').innerHTML = '<div class="skeleton-bar" style="width:220px;height:220px;border-radius:50%;"></div>';
   document.querySelector('#simTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(9)).join('');
   document.querySelector('#simSectorTable tbody').innerHTML = Array.from({length:3}).map(()=>skeletonRow(4)).join('');
