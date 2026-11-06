@@ -354,6 +354,53 @@
   }
   .pie-legend-val{ font-family:var(--mono);color:var(--ink-dim);font-size:11.5px;flex:0 0 100px;text-align:right; }
   .pie-legend-pct{ font-family:var(--mono);font-weight:700;color:var(--ink);flex:0 0 62px;text-align:right; }
+
+  /* ---------- Stat cards ---------- */
+  /* Generic card-grid design, originally built for the bond Maturity Timeline
+     (one card per maturity date) and reused as-is for stock summary/highlight
+     cards (one card per metric, or one per notable holding) — same visual
+     language everywhere a quick-glance "headline number + context" card is
+     useful, rather than a bonds-only component. */
+  .card-grid{ display:flex;flex-wrap:wrap;gap:16px; }
+  .stat-card{
+    position:relative;
+    flex:1 1 220px;min-width:220px;
+    background:var(--glass-bg-strong);
+    border:1px solid var(--glass-border);
+    border-radius:26px;
+    padding:18px 18px 16px;
+    overflow:hidden;
+  }
+  /* The top accent stripe used to be a border-image, but border-image ignores
+     border-radius in every major browser — the card's rounded corners were
+     real, but that gradient line stayed hard-edged regardless, which is what
+     actually read as "no visible rounding" even after increasing the radius.
+     A pseudo-element clipped by the card's own overflow:hidden respects the
+     border-radius properly instead. */
+  .stat-card::before{
+    content:"";
+    position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg, var(--accent), var(--red));
+  }
+  .stat-card-eyebrow{
+    font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;
+    color:var(--ink-dim);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;
+  }
+  .stat-card-sub{ font-size:12px;color:var(--ink-dim);margin-bottom:10px;font-weight:500; }
+  .stat-card-label{
+    font-family:var(--font-system);font-size:10.5px;text-transform:uppercase;
+    letter-spacing:0.05em;color:var(--ink-dim);margin-bottom:2px;
+  }
+  .stat-card-value{
+    font-family:var(--mono);font-size:22px;font-weight:700;color:var(--ink);
+    margin-bottom:10px;line-height:1.2;
+  }
+  .stat-card-delta{
+    font-family:var(--mono);font-size:13px;font-weight:700;
+    display:flex;align-items:baseline;gap:6px;
+    padding-top:10px;border-top:1px solid var(--glass-border);
+  }
+  .stat-card-footnote{ font-family:var(--mono);font-size:11px;color:var(--ink-dim);font-weight:500; }
 </style>
 </head>
 
@@ -397,6 +444,7 @@
     <div class="country-tabs" role="tablist" aria-label="Country">
       <button type="button" class="country-tab" id="countryIN" data-country="IN" role="tab">🇮🇳 India (₹)</button>
       <button type="button" class="country-tab" id="countryUS" data-country="US" role="tab">🇺🇸 US ($)</button>
+      <button type="button" class="country-tab" id="countryBONDS" data-country="BONDS" role="tab">📜 Bonds</button>
     </div>
     <div class="panel-head"><h2>Paste Holdings Data</h2><span class="tag">input</span></div>
     <div class="panel-body">
@@ -411,66 +459,116 @@
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h2>1 · Current Holdings</h2><span class="tag" id="holdCount"></span></div>
-    <div class="panel-body" style="overflow-x:auto;">
-      <table id="holdingsTable">
-        <thead><tr>
-          <th>Symbol</th><th>Qty</th><th>Buy Avg</th><th>Buy Value</th>
-          <th id="ltpHeader">LTP</th><th>Present Value</th><th>P&amp;L</th><th>P&amp;L %</th>
-        </tr></thead>
-        <tbody><tr><td colspan="8" class="empty">No data yet — paste your holdings above.</td></tr></tbody>
-        <tfoot></tfoot>
-      </table>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="panel-head"><h2 id="sectorHeading">2 · Sector Allocation</h2><span class="tag">by invested value</span></div>
-    <div class="panel-body" style="overflow-x:auto;">
-      <div class="pie-wrap" id="pieWrap">
-        <div class="empty">Sector breakdown appears here after parsing.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="panel-head"><h2>3 · Market Cap Allocation</h2><span class="tag">Large / Mid / Small</span></div>
-    <div class="panel-body" style="overflow-x:auto;">
-      <div class="pie-wrap" id="capWrap">
-        <div class="empty">Market cap breakdown appears here after parsing.</div>
-      </div>
-      <div class="hint" id="capHint">Tiers follow AMFI's latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding's approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.</div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="panel-head"><h2>4 · Add Shares — Average Price Simulator</h2><span class="tag tag-red">what-if</span></div>
-    <div class="panel-body" style="overflow-x:auto;">
-      <table id="simTable">
-        <thead><tr>
-          <th>Symbol</th><th>Current Qty</th><th>Current Avg</th><th>LTP</th>
-          <th>Add Qty</th><th>New Qty</th><th>Avg Price Change</th><th>New Avg Price</th><th>New Buy Value</th>
-        </tr></thead>
-        <tbody><tr><td colspan="9" class="empty">Simulator appears here after parsing.</td></tr></tbody>
-      </table>
-      <div class="hint">Enter how many extra shares of a stock you'd buy today at its current LTP — the new average buy price updates live, starting from your recorded Buy Avg (not Buy Value ÷ Qty, which can drift from Buy Avg after a demerger, bonus issue, or split reallocates cost basis — Buy Avg is treated as the reliable per-share figure here).</div>
-
-      <div style="margin-top:22px;border-top:1px solid var(--glass-border);padding-top:18px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <h3 class="subhead">Updated Sector Allocation (after adds)</h3>
-          <span class="tag tag-red">by invested value</span>
+  <div id="stockPanels">
+    <div class="panel">
+      <div class="panel-head"><h2>1 · Current Holdings</h2><span class="tag" id="holdCount"></span></div>
+      <div class="panel-body">
+        <div id="stockSummaryCards" class="card-grid" style="margin-bottom:20px;">
+          <div class="empty">Your portfolio summary appears here after parsing.</div>
         </div>
-        <table id="simSectorTable">
-          <thead><tr><th>Sector</th><th>Current Invested</th><th>Updated Invested</th><th>New Weightage</th></tr></thead>
-          <tbody><tr><td colspan="4" class="empty">Add share quantities above to see the updated mix.</td></tr></tbody>
-        </table>
-        <div class="hint">Recalculates live as you change the Add Qty column above — shows how your sector mix shifts if you go through with those buys.</div>
+        <div style="overflow-x:auto;">
+          <table id="holdingsTable">
+            <thead><tr>
+              <th>Symbol</th><th>Qty</th><th>Buy Avg</th><th>Buy Value</th>
+              <th id="ltpHeader">LTP</th><th>Present Value</th><th>P&amp;L</th><th>P&amp;L %</th>
+            </tr></thead>
+            <tbody><tr><td colspan="8" class="empty">No data yet — paste your holdings above.</td></tr></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
       </div>
     </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2 id="sectorHeading">2 · Sector Allocation</h2><span class="tag">by invested value</span></div>
+      <div class="panel-body" style="overflow-x:auto;">
+        <div class="pie-wrap" id="pieWrap">
+          <div class="empty">Sector breakdown appears here after parsing.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>3 · Market Cap Allocation</h2><span class="tag">Large / Mid / Small</span></div>
+      <div class="panel-body" style="overflow-x:auto;">
+        <div class="pie-wrap" id="capWrap">
+          <div class="empty">Market cap breakdown appears here after parsing.</div>
+        </div>
+        <div class="hint" id="capHint">Tiers follow AMFI's latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding's approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>4 · Add Shares — Average Price Simulator</h2><span class="tag tag-red">what-if</span></div>
+      <div class="panel-body" style="overflow-x:auto;">
+        <table id="simTable">
+          <thead><tr>
+            <th>Symbol</th><th>Current Qty</th><th>Current Avg</th><th>LTP</th>
+            <th>Add Qty</th><th>New Qty</th><th>Avg Price Change</th><th>New Avg Price</th><th>New Buy Value</th>
+          </tr></thead>
+          <tbody><tr><td colspan="9" class="empty">Simulator appears here after parsing.</td></tr></tbody>
+        </table>
+        <div class="hint">Enter how many extra shares of a stock you'd buy today at its current LTP — the new average buy price updates live, starting from your recorded Buy Avg (not Buy Value ÷ Qty, which can drift from Buy Avg after a demerger, bonus issue, or split reallocates cost basis — Buy Avg is treated as the reliable per-share figure here).</div>
+
+        <div style="margin-top:22px;border-top:1px solid var(--glass-border);padding-top:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 class="subhead">Updated Sector Allocation (after adds)</h3>
+            <span class="tag tag-red">by invested value</span>
+          </div>
+          <table id="simSectorTable">
+            <thead><tr><th>Sector</th><th>Current Invested</th><th>Updated Invested</th><th>New Weightage</th></tr></thead>
+            <tbody><tr><td colspan="4" class="empty">Add share quantities above to see the updated mix.</td></tr></tbody>
+          </table>
+          <div class="hint">Recalculates live as you change the Add Qty column above — shows how your sector mix shifts if you go through with those buys.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot-note">Sector tags are best-effort guesses for NSE/BSE symbols. Toggle light/dark above — your choice is remembered on this device.</div>
   </div>
 
-  <div class="foot-note">Sector tags are best-effort guesses for NSE/BSE symbols. Toggle light/dark above — your choice is remembered on this device.</div>
+  <div id="bondPanels" style="display:none;">
+    <div class="panel">
+      <div class="panel-head"><h2>1 · Maturity Timeline</h2><span class="tag tag-red">held to maturity</span></div>
+      <div class="panel-body">
+        <div id="maturityTimeline" class="card-grid">
+          <div class="empty">Your maturity timeline appears here after parsing.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>2 · Maturity Projection (detail)</h2><span class="tag tag-red">held to maturity</span></div>
+      <div class="panel-body" style="overflow-x:auto;">
+        <table id="bondProjectionTable">
+          <thead><tr>
+            <th>Maturity Date</th><th>Bond(s)</th><th>Invested</th>
+            <th>Expected Maturity Value</th><th>Gain (₹)</th><th>Gain (%)</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" class="empty">Maturity projection appears here after parsing.</td></tr></tbody>
+          <tfoot></tfoot>
+        </table>
+        <div class="hint">Rows are grouped by maturity date (soonest first) — lots that pay out on the same date are combined, since that's when you'll actually receive the money, even if they were bought separately at different prices. Projection method: since these bonds are held to maturity (not marked-to-market or sold early), the expected maturity value for each lot is estimated as <b>Invested Amount × (1 + Expected Return % × Tenure in years)</b> — a simple, non-compounded annualized return over the full holding period, then summed across the lots sharing that maturity date. This is an estimate based on the stated "Expected Returns" figure, not a guaranteed payout — the bond's actual terms (coupon schedule, call/put options, issuer default risk) determine the real amount received at maturity.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>3 · Bond Holdings</h2><span class="tag" id="bondCount"></span></div>
+      <div class="panel-body" style="overflow-x:auto;">
+        <table id="bondsTable">
+          <thead><tr>
+            <th>Purchase Date</th><th>Bond Name</th><th>Rating</th><th>Face Value</th>
+            <th>Purchased Price</th><th>Units</th><th>Invested</th><th>Expected Return</th>
+            <th>Tenure</th><th>Maturity Date</th>
+          </tr></thead>
+          <tbody><tr><td colspan="10" class="empty">No data yet — paste your bond purchases above.</td></tr></tbody>
+          <tfoot></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="foot-note">Bond figures are based on your pasted purchase data and the platform's stated expected return — not a live or guaranteed valuation.</div>
+  </div>
 </div>
 
 <script>
@@ -795,10 +893,27 @@ MSFT\tMicrosoft Corp\t$385.69\t$495.63\t0.134\t$51.760\t$66.51\tTech
 TM\tToyota Motor Corp\t$198.00\t$198.20\t0.497\t$98.410\t$98.51\tAutomobile
 GOOGL\tAlphabet Inc Class A\t$345.64\t$344.18\t0.448\t$154.860\t$154.21\tTech`;
 
+// Bundled Bonds sample — header row + tab-separated, ₹-prefixed prices,
+// percentage expected returns, a tenure given in months, and a maturity date
+// as free text (never parsed as a real Date — there's no need to, since the
+// tenure-in-months field already gives everything needed for the maturity
+// projection; the maturity date is purely for display).
+const SAMPLE_BONDS = `Date\tBond Name\tRating\tBond Price\tPurchased Price\tNo of Units\tTotal Price\tExpected Returns\tTenure\tMaturity
+1 Jul 2026\tMuthoot Fincorp\tAA\t₹1,000.00\t₹990.35\t1\t₹990.35\t10.00%\t24 months\t16 July 2028
+7 Jul 2026\tMuthoot Fincorp\tAA\t₹1,000.00\t₹991.91\t3\t₹2,975.71\t10.00%\t24 months\t16 July 2028
+17 Jul 2026\tMuthoot Fincorp\tAA\t₹1,000.00\t₹990.68\t5\t₹4,953.38\t9.75%\t24 months\t16 July 2028
+3 Aug 2026\tMuthoot MCred\tA\t₹1,000.00\t₹997.00\t1\t₹997.00\t10.00%\t13 months\t29 Aug 2027
+10 Aug 2026\tMuthoot MCred\tA\t₹1,000.00\t₹998.57\t3\t₹2,995.71\t10.00%\t13 months\t29 Aug 2027
+11 Aug 2026\tMuthoot MCred\tA\t₹1,000.00\t₹999.09\t2\t₹1,998.18\t10.00%\t13 months\t29 Aug 2027
+1 Sep 2026\tMuthoot Fincorp\tAA\t₹1,000.00\t₹991.07\t1\t₹991.07\t10.00%\t22 months\t16 July 2028
+2 Oct 2026\tMuthoot Fincorp\tAA\t₹1,000.00\t₹995.38\t1\t₹995.38\t10.00%\t23 months\t16 July 2028
+6 Nov 2026\tMuthoot MCred\tA\t₹10,000.00\t₹9,855.88\t1\t₹9,855.88\t10.35%\t36 months\t30 October 2029`;
+
 let holdings = [];
+let bonds = [];
 let addQtyState = []; // parallel array to `holdings`: extra qty the user is considering buying, per row
 
-function num(s){ return parseFloat(String(s).replace(/,/g,'').replace(/\$/g,'')); }
+function num(s){ return parseFloat(String(s).replace(/,/g,'').replace(/[$₹]/g,'')); }
 // Named `inr` for historical reasons (this tool started India-only), but it's
 // now the single money-formatting function for both currencies — it reads
 // CURRENT_COUNTRY at call time rather than being hardcoded to ₹.
@@ -949,6 +1064,55 @@ function sectorFor(symbol){
   return sectorOverrides[symbol] || SECTOR_MAP[symbol] || "Uncategorized";
 }
 
+// ---------- Bonds: a fundamentally different asset class from stocks ----------
+// Header row + tab-separated columns:
+//   Date  Bond Name  Rating  Bond Price  Purchased Price  No of Units  Total Price  Expected Returns  Tenure  Maturity
+// Bonds here are held to maturity (not sold/marked-to-market), so there's no
+// "current price"/P&L concept the way stocks have one — instead the useful
+// output is a *projected maturity value*, computed below.
+function parseBonds(raw){
+  const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const out = [];
+  lines.forEach(line=>{
+    if(!line.includes('\t')) return; // skip the header row and any stray blank lines
+    const cols = line.split('\t').map(c=>c.trim());
+    if(cols.length < 10) return;
+    const [date, bondName, rating, bondPriceStr, purchasedPriceStr, unitsStr, totalPriceStr, expectedReturnStr, tenureStr, maturity] = cols;
+    if(/^date$/i.test(date)) return; // header row itself, in case it wasn't filtered above
+    const tenureMatch = String(tenureStr).match(/([\d.]+)/);
+    out.push({
+      date,
+      bondName,
+      rating,
+      bondPrice: num(bondPriceStr),
+      purchasedPrice: num(purchasedPriceStr),
+      units: parseFloat(unitsStr),
+      totalPrice: num(totalPriceStr),
+      expectedReturn: parseFloat(String(expectedReturnStr).replace(/%/g,'')),
+      tenureMonths: tenureMatch ? parseFloat(tenureMatch[1]) : 0,
+      tenureLabel: tenureStr,
+      maturity
+    });
+  });
+  return out;
+}
+
+// Projected maturity value for one purchase lot. Method: simple (non-
+// compounded) annualized return over the full tenure — Invested × (1 + rate
+// × years) — not Invested × (1+rate)^years. This matches how these platforms
+// typically quote "expected returns" for a fixed-term holding period (a
+// single annualized figure meant to be read as "X% per year for N years"),
+// rather than a compounding reinvestment assumption that would overstate the
+// payout for anything but a true zero-coupon structure. This is an estimate,
+// not the bond's guaranteed legal payout — say so wherever it's shown.
+function projectBondMaturity(b){
+  const years = b.tenureMonths / 12;
+  const gainAmount = b.totalPrice * (b.expectedReturn / 100) * years;
+  const maturityAmount = b.totalPrice + gainAmount;
+  const gainPct = b.totalPrice ? (gainAmount / b.totalPrice * 100) : 0;
+  return { maturityAmount, gainAmount, gainPct };
+}
+
 function renderHoldings(){
   const tbody = document.querySelector('#holdingsTable tbody');
   const tfoot = document.querySelector('#holdingsTable tfoot');
@@ -979,6 +1143,64 @@ function renderHoldings(){
     <td class="${totPnl>=0?'up':'down'}">${inr(totPnl, true)}</td>
     <td class="${totPnlPct>=0?'up':'down'}">${pct(totPnlPct, true)}</td>
   </tr>`;
+}
+
+// Same card design as the bond Maturity Timeline (one headline number +
+// context per card), applied to stocks: an overall Portfolio Value card plus
+// Top Gainer / Biggest Drag highlights, so there's a quick-glance summary
+// above the full holdings table instead of only the dense tfoot totals row.
+function renderStockSummaryCards(){
+  const wrap = document.getElementById('stockSummaryCards');
+  if(!holdings.length){
+    wrap.innerHTML = '<div class="empty">Your portfolio summary appears here after parsing.</div>';
+    return;
+  }
+  const totInvested = holdings.reduce((a,h)=>a+h.buyValue,0);
+  const totPresent = holdings.reduce((a,h)=>a+h.presentValue,0);
+  const totGain = totPresent - totInvested;
+  const totGainPct = totInvested ? (totGain/totInvested*100) : 0;
+  const totGainClass = totGain >= 0 ? 'up' : 'down';
+
+  const best = holdings.reduce((a,h)=> h.pnlPct > a.pnlPct ? h : a, holdings[0]);
+  // "Biggest Drag" means the stock actually costing you the most money — so
+  // selected by absolute ₹ loss, not by % loss. A stock down 70% on a ₹500
+  // position is a smaller real drag on the portfolio than one down 10% on a
+  // ₹50,000 position; the card should reflect that, not just the steepest
+  // percentage decline.
+  const worst = holdings.reduce((a,h)=> h.pnl < a.pnl ? h : a, holdings[0]);
+
+  const portfolioCard = `<div class="stat-card fade-in">
+    <div class="stat-card-eyebrow">💼 Portfolio</div>
+    <div class="stat-card-sub">${holdings.length} ${holdings.length === 1 ? 'holding' : 'holdings'}</div>
+    <div class="stat-card-label">Present Value</div>
+    <div class="stat-card-value">${inr(totPresent)}</div>
+    <div class="stat-card-footnote">Invested ${inr(totInvested)}</div>
+    <div class="stat-card-delta ${totGainClass}">${inr(totGain, true)} &nbsp;(${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%)</div>
+  </div>`;
+
+  // showPct defaults to true (Top Gainer keeps both the ₹ amount and the %
+  // for context); Biggest Drag passes false — the headline is already the
+  // loss amount in ₹, and that card specifically shouldn't repeat it as a
+  // percentage too.
+  const moverCard = (label, emoji, h, cls, showPct = true) => `<div class="stat-card fade-in">
+    <div class="stat-card-eyebrow">${emoji} ${label}</div>
+    <div class="stat-card-sub">${h.symbol}</div>
+    <div class="stat-card-label">Gain / Loss</div>
+    <div class="stat-card-value ${cls}">${inr(h.pnl, true)}</div>
+    <div class="stat-card-footnote">Invested ${inr(h.buyValue)} → Present ${inr(h.presentValue)}</div>
+    ${showPct ? `<div class="stat-card-delta ${cls}">${pct(h.pnlPct, true)}</div>` : ''}
+  </div>`;
+
+  let cards = portfolioCard;
+  if(holdings.length > 1){
+    cards += moverCard('Top Gainer', '🏆', best, 'up') + moverCard('Biggest Drag', '📉', worst, 'down', false);
+  } else {
+    // A single holding can't meaningfully have a separate "best" vs "worst" —
+    // showing both would just be the same stock twice, which reads as a bug,
+    // not a feature, so skip the mover cards entirely in that case.
+    cards += moverCard('Your Holding', '📊', best, best.pnl >= 0 ? 'up' : 'down');
+  }
+  wrap.innerHTML = cards;
 }
 
 // Shared by the sector table and the pie chart, so both always agree on the numbers.
@@ -1292,9 +1514,139 @@ function renderSimSectors(){
 
 function renderAll(){
   renderHoldings();
+  renderStockSummaryCards();
   renderSectorPie();
   renderMarketCapPie();
   renderSimulator();
+}
+
+function renderBondHoldings(){
+  const tbody = document.querySelector('#bondsTable tbody');
+  const tfoot = document.querySelector('#bondsTable tfoot');
+  document.getElementById('bondCount').textContent = bonds.length + (bonds.length === 1 ? ' bond' : ' bonds');
+  if(!bonds.length){
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">No data yet — paste your bond purchases above.</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = bonds.map(b => `
+    <tr class="fade-in">
+      <td>${b.date}</td>
+      <td class="sym">${b.bondName}</td>
+      <td>${b.rating}</td>
+      <td>${inr(b.bondPrice)}</td>
+      <td>${inr(b.purchasedPrice)}</td>
+      <td>${b.units}</td>
+      <td>${inr(b.totalPrice)}</td>
+      <td class="up">${b.expectedReturn.toFixed(2)}%</td>
+      <td>${b.tenureLabel}</td>
+      <td>${b.maturity}</td>
+    </tr>`).join('');
+  const totInvested = bonds.reduce((a,b)=>a+b.totalPrice,0);
+  tfoot.innerHTML = `<tr>
+    <td>Total</td><td></td><td></td><td></td><td></td><td></td>
+    <td>${inr(totInvested)}</td><td></td><td></td><td></td>
+  </tr>`;
+}
+
+// Groups lots by maturity date, since lots maturing on the same date pay out
+// together — the question "how much will I actually receive, and when" is
+// answered per payout date, not per individual purchase. Lots are still kept
+// distinct everywhere upstream (Bond Holdings table, the per-lot projection
+// math); only this summary view collapses them. Sorted chronologically
+// (soonest payout first) using native Date parsing, which handles every
+// maturity-date format seen so far ("16 July 2028", "29 Aug 2027", "30
+// October 2029") — if a future format doesn't parse, it sorts last via the
+// NaN fallback below rather than throwing.
+function groupBondsByMaturity(){
+  const groups = {};
+  bonds.forEach(b=>{
+    if(!groups[b.maturity]) groups[b.maturity] = [];
+    groups[b.maturity].push(b);
+  });
+  return Object.entries(groups).sort((a,b)=>{
+    const da = new Date(a[0]).getTime();
+    const db = new Date(b[0]).getTime();
+    if(isNaN(da) && isNaN(db)) return 0;
+    if(isNaN(da)) return 1;
+    if(isNaN(db)) return -1;
+    return da - db;
+  });
+}
+
+function renderBondProjection(){
+  const tbody = document.querySelector('#bondProjectionTable tbody');
+  const tfoot = document.querySelector('#bondProjectionTable tfoot');
+  if(!bonds.length){
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Maturity projection appears here after parsing.</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+  const groups = groupBondsByMaturity();
+  tbody.innerHTML = groups.map(([maturity, lots])=>{
+    const invested = lots.reduce((a,b)=>a+b.totalPrice,0);
+    const maturityAmount = lots.reduce((a,b)=>a+projectBondMaturity(b).maturityAmount,0);
+    const gainAmount = maturityAmount - invested;
+    const gainPct = invested ? (gainAmount/invested*100) : 0;
+    const names = [...new Set(lots.map(b=>b.bondName))];
+    const nameLabel = names.length === 1 ? names[0] : names.join(', ');
+    const lotNote = lots.length > 1 ? ` <span style="color:var(--ink-dim);font-weight:500;">(${lots.length} lots)</span>` : '';
+    return `<tr class="fade-in">
+      <td>${maturity}</td>
+      <td class="sym">${nameLabel}${lotNote}</td>
+      <td>${inr(invested)}</td>
+      <td>${inr(maturityAmount)}</td>
+      <td class="up">${inr(gainAmount, true)}</td>
+      <td class="up">${gainPct.toFixed(2)}%</td>
+    </tr>`;
+  }).join('');
+  const totInvested = bonds.reduce((a,b)=>a+b.totalPrice,0);
+  const totMaturity = bonds.reduce((a,b)=>a+projectBondMaturity(b).maturityAmount,0);
+  const totGain = totMaturity - totInvested;
+  const totGainPct = totInvested ? (totGain/totInvested*100) : 0;
+  tfoot.innerHTML = `<tr>
+    <td>Total</td><td></td>
+    <td>${inr(totInvested)}</td>
+    <td>${inr(totMaturity)}</td>
+    <td class="up">${inr(totGain, true)}</td>
+    <td class="up">${totGainPct.toFixed(2)}%</td>
+  </tr>`;
+}
+
+// Card-based view of the same grouped-by-maturity-date data the projection
+// table shows — answers "how much on this date, and how much did I gain"
+// at a glance, one card per payout date, rather than a dense table row.
+// Reuses groupBondsByMaturity() so the two views can never disagree.
+function renderMaturityTimeline(){
+  const wrap = document.getElementById('maturityTimeline');
+  if(!bonds.length){
+    wrap.innerHTML = '<div class="empty">Your maturity timeline appears here after parsing.</div>';
+    return;
+  }
+  const groups = groupBondsByMaturity();
+  wrap.innerHTML = groups.map(([maturity, lots])=>{
+    const invested = lots.reduce((a,b)=>a+b.totalPrice,0);
+    const maturityAmount = lots.reduce((a,b)=>a+projectBondMaturity(b).maturityAmount,0);
+    const gainAmount = maturityAmount - invested;
+    const gainPct = invested ? (gainAmount/invested*100) : 0;
+    const names = [...new Set(lots.map(b=>b.bondName))];
+    const nameLabel = names.join(', ') + (lots.length > names.length ? ` (${lots.length} lots)` : '');
+    const gainClass = gainAmount >= 0 ? 'up' : 'down';
+    return `<div class="stat-card fade-in">
+      <div class="stat-card-eyebrow">📅 ${maturity}</div>
+      <div class="stat-card-sub">${nameLabel}</div>
+      <div class="stat-card-label">You'll receive</div>
+      <div class="stat-card-value">${inr(maturityAmount)}</div>
+      <div class="stat-card-footnote">Invested ${inr(invested)}</div>
+      <div class="stat-card-delta ${gainClass}">${inr(gainAmount, true)} &nbsp;(${gainPct>=0?'+':''}${gainPct.toFixed(2)}%)</div>
+    </div>`;
+  }).join('');
+}
+
+function renderBonds(){
+  renderBondHoldings();
+  renderMaturityTimeline();
+  renderBondProjection();
 }
 
 // ---------- Skeleton loading state ----------
@@ -1304,8 +1656,17 @@ function skeletonRow(cols){
     '</tr>';
 }
 function showSkeletons(){
+  if(CURRENT_COUNTRY === 'BONDS'){
+    document.querySelector('#bondsTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(10)).join('');
+    document.querySelector('#bondsTable tfoot').innerHTML = '';
+    document.getElementById('maturityTimeline').innerHTML = Array.from({length:3}).map(()=>'<div class="skeleton-bar" style="flex:1 1 220px;min-width:220px;height:140px;border-radius:22px;"></div>').join('');
+    document.querySelector('#bondProjectionTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(6)).join('');
+    document.querySelector('#bondProjectionTable tfoot').innerHTML = '';
+    return;
+  }
   document.querySelector('#holdingsTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(8)).join('');
   document.querySelector('#holdingsTable tfoot').innerHTML = '';
+  document.getElementById('stockSummaryCards').innerHTML = Array.from({length:3}).map(()=>'<div class="skeleton-bar" style="flex:1 1 220px;min-width:220px;height:140px;border-radius:22px;"></div>').join('');
   document.getElementById('pieWrap').innerHTML = '<div class="skeleton-bar" style="width:220px;height:220px;border-radius:50%;"></div>';
   document.querySelector('#simTable tbody').innerHTML = Array.from({length:4}).map(()=>skeletonRow(9)).join('');
   document.querySelector('#simSectorTable tbody').innerHTML = Array.from({length:3}).map(()=>skeletonRow(4)).join('');
@@ -1320,13 +1681,24 @@ function applyCountry(country){
   CURRENT_COUNTRY = country;
   document.getElementById('countryIN').classList.toggle('active', country === 'IN');
   document.getElementById('countryUS').classList.toggle('active', country === 'US');
-  document.getElementById('ltpHeader').textContent = country === 'US' ? 'Price' : 'LTP';
-  document.getElementById('sectorHeading').textContent = country === 'US' ? '2 · Category Allocation' : '2 · Sector Allocation';
-  document.getElementById('capHint').textContent = country === 'US'
-    ? 'Tiers follow the standard US convention (Large Cap ≥ $10B, Mid Cap ≥ $2B, else Small Cap), applied to each holding\'s approximate market cap.'
-    : 'Tiers follow AMFI\'s latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding\'s approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.';
-  document.getElementById('rawInput').placeholder = country === 'US'
-    ? 'Paste your US holdings export here — header row + tab-separated columns: Ticker, Description, Average/share, Current Price, No of Shares, Invested Value, Current Value, Category.'
+  document.getElementById('countryBONDS').classList.toggle('active', country === 'BONDS');
+
+  // Bonds use an entirely different set of panels (no sector/market-cap/
+  // simulator concepts apply to a held-to-maturity instrument) — swap the
+  // whole panel group rather than trying to relabel the stock panels.
+  document.getElementById('stockPanels').style.display = country === 'BONDS' ? 'none' : '';
+  document.getElementById('bondPanels').style.display = country === 'BONDS' ? '' : 'none';
+
+  if(country !== 'BONDS'){
+    document.getElementById('ltpHeader').textContent = country === 'US' ? 'Price' : 'LTP';
+    document.getElementById('sectorHeading').textContent = country === 'US' ? '2 · Category Allocation' : '2 · Sector Allocation';
+    document.getElementById('capHint').textContent = country === 'US'
+      ? 'Tiers follow the standard US convention (Large Cap ≥ $10B, Mid Cap ≥ $2B, else Small Cap), applied to each holding\'s approximate market cap.'
+      : 'Tiers follow AMFI\'s latest classification (Large Cap ≥ ₹1,06,300 cr, Mid Cap ≥ ₹33,500 cr, else Small Cap), applied to each holding\'s approximate market cap. ITBEES (an index ETF, not a company) is grouped separately under "ETF / Fund" since it has no market cap of its own.';
+  }
+  document.getElementById('rawInput').placeholder =
+    country === 'US' ? 'Paste your US holdings export here — header row + tab-separated columns: Ticker, Description, Average/share, Current Price, No of Shares, Invested Value, Current Value, Category.'
+    : country === 'BONDS' ? 'Paste your bond purchases here — header row + tab-separated columns: Date, Bond Name, Rating, Bond Price, Purchased Price, No of Units, Total Price, Expected Returns, Tenure, Maturity.'
     : 'Paste your holdings snapshot here — either the ₹-concatenated text or the tab-separated table copied straight from your broker\'s holdings screen. Both formats are auto-detected.';
 }
 document.getElementById('countryIN').addEventListener('click', ()=>{
@@ -1339,6 +1711,12 @@ document.getElementById('countryUS').addEventListener('click', ()=>{
   applyCountry('US');
   const fromStorage = loadLastData('US');
   document.getElementById('rawInput').value = fromStorage ? fromStorage.raw : SAMPLE_US;
+  parseBtn.click();
+});
+document.getElementById('countryBONDS').addEventListener('click', ()=>{
+  applyCountry('BONDS');
+  const fromStorage = loadLastData('BONDS');
+  document.getElementById('rawInput').value = fromStorage ? fromStorage.raw : SAMPLE_BONDS;
   parseBtn.click();
 });
 
@@ -1474,9 +1852,25 @@ parseBtn.addEventListener('click', ()=>{
   // Brief, deliberate pause so the shimmer is visible — this is instant math,
   // but a hard cut from skeleton to full tables reads as a glitch, not speed.
   setTimeout(()=>{
-    const parsed = parseHoldings(raw);
     parseBtn.classList.remove('loading');
     parseBtn.disabled = false;
+
+    if(CURRENT_COUNTRY === 'BONDS'){
+      const parsed = parseBonds(raw);
+      if(!parsed.length){
+        msg.textContent = "Couldn't find any rows in that format — check it matches Date/Bond Name/Rating/Bond Price/Purchased Price/No of Units/Total Price/Expected Returns/Tenure/Maturity, tab-separated with a header row.";
+        renderBonds();
+        return;
+      }
+      bonds = parsed;
+      saveLastData(raw, 'BONDS');
+      msg.textContent = `Parsed ${parsed.length} bond ${parsed.length === 1 ? 'purchase' : 'purchases'}. Saved on this device.`;
+      document.getElementById('asof').textContent = new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+      renderBonds();
+      return;
+    }
+
+    const parsed = parseHoldings(raw);
     if(!parsed.length){
       msg.textContent = CURRENT_COUNTRY === 'US'
         ? "Couldn't find any rows in that format — check it matches Ticker/Description/Average per share/Current Price/No of Shares/Invested Value/Current Value/Category, tab-separated with a header row."
@@ -1494,7 +1888,9 @@ parseBtn.addEventListener('click', ()=>{
 });
 
 document.getElementById('sampleBtn').addEventListener('click', ()=>{
-  document.getElementById('rawInput').value = CURRENT_COUNTRY === 'US' ? SAMPLE_US : SAMPLE;
+  document.getElementById('rawInput').value =
+    CURRENT_COUNTRY === 'US' ? SAMPLE_US :
+    CURRENT_COUNTRY === 'BONDS' ? SAMPLE_BONDS : SAMPLE;
 });
 
 document.getElementById('shareBtn').addEventListener('click', async ()=>{
@@ -1525,7 +1921,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
   } else {
     initialCountry = loadLastActiveCountry();
     const fromStorage = loadLastData(initialCountry);
-    initialRaw = fromStorage ? fromStorage.raw : (initialCountry === 'US' ? SAMPLE_US : SAMPLE);
+    initialRaw = fromStorage ? fromStorage.raw :
+      (initialCountry === 'US' ? SAMPLE_US : initialCountry === 'BONDS' ? SAMPLE_BONDS : SAMPLE);
   }
   applyCountry(initialCountry);
   document.getElementById('rawInput').value = initialRaw;
